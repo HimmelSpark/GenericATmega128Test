@@ -24,7 +24,8 @@ MOTOR_OMEGA_DATA __omega_objective;
 double __omega_L_raw = 0.0, __omega_R_raw = 0.0;	// оценки производных,
 													// не умноженные на масштабирующий коэффициент
 
-uint8_t __estimator_reset		= 1;	// флаг сброса интеграторов оценивателя
+static uint8_t __estimator_reset = 1;	// флаг сброса интеграторов оценивателя;
+// static потому, что переменная с таким же именем используется в оценивателе в bmp180.c
 uint8_t __picontroller_reset	= 1;	// флаг сброса интеграторов регулятора
 /*uint8_t __picontroller_active	= 0;	// флаг работы ПИ-регулятора*/
 uint8_t __motor_L_reached_max	= 0;	// флаг достижения L двигателем ограничения PWM

@@ -16,7 +16,7 @@
 
 uint8_t i2c_mode;
 
-uint8_t i2c_sla_addr;				// 7 бит адреса
+uint8_t i2c_sla_addr;				// 7 битов адреса
 uint8_t i2c_reg_addr;				// регистр, в который пишем (или начиная с которого читатем)
 uint8_t i2c_data;					// байт, который кладём в регистр
 uint8_t i2c_bytes2read_count;		// сколько байтов прочитать

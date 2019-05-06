@@ -92,12 +92,10 @@ int main (void)
 	rtos_set_task (show_info_uart, 1000, 200);
 	rtos_set_task (show_info_lcd, 1000, 500);
 	
-	sei ();
+	rtos_set_task (bmp180_init, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
+	rtos_set_task (mpu6050_init, 200, RTOS_RUN_ONCE);
 	
-//	Следующие инициализации требуют работы планировщика
-// 	bmp180_init ();
- 	mpu6050_init ();
-
+	sei ();
 
     while (1) 
     {
@@ -124,11 +122,12 @@ void show_info_uart (void)
 	uart_clrscr ();
 	uart_home ();
 	
- 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
-// 	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
+	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
+	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
 
-	MOTOR_OMEGA_DATA omega = motors_get_omega ();
-	MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
+	MOTOR_OMEGA_DATA	omega		= motors_get_omega (),
+						omega_obj	= motors_get_omega_obj ();
+						
 	MOTOR_POWER_DATA power = motors_get_power ();
 	
 // В идеале надо вывести "фон" и обновлять только изменяющиеся значения
@@ -136,18 +135,20 @@ void show_info_uart (void)
 	printf ("Elapsed Time		%.1f	[s]\n\n", time);
 	time += 0.2;
 
-// 	printf ("BMP180 TEMP:		%.1f	[deg. C]\n",  bmp180_get_T ());
-// 	printf ("BMP180 PRESSURE:	%.1f	[hPa]\n",  bmp180_get_P_hPa ());
+	printf ("BMP180 TEMP:		%.1f	[deg. C]\n",  bmp180_get_T ());
+	printf ("BMP180 PRESSURE:	%.1f	[hPa]\n",  bmp180_get_P_hPa ());
+	printf ("BMP180 h:			%.1f	[m]\n", bmp180_get_h ());
+	printf ("BMP180 dh/dt:		%.1f	[m/s]\n\n", bmp180_get_dhdt ());
 	
  	printf ("MPU6050 TEMP:		%.1f	[deg. C]\n", mpu6050_get_T ());
-	printf ("MPU6050 ACCEL:		Wx=%.3f	Wy=%.3f	Wz=%.3f	[m/s^2]\n\n", \
+	printf ("MPU6050 ACCEL:		Wx=%.3f	Wy=%.3f	Wz=%.3f	[m/s^2]\n", \
 					mpu6050_accel.aX, mpu6050_accel.aY, mpu6050_accel.aZ);
-// 	printf ("MPU6050 GYRO:		OMx=%.3f	OMy=%.3f	OMz=%.3f	[deg./s]\n", \
-// 					mpu6050_gyro.gX, mpu6050_gyro.gY, mpu6050_gyro.gZ);
+	printf ("MPU6050 GYRO:		OMx=%.3f	OMy=%.3f	OMz=%.3f	[deg./s]\n\n", \
+					mpu6050_gyro.gX, mpu6050_gyro.gY, mpu6050_gyro.gZ);
 
 	printf ("MOTOR_L:	TGT_SPEED = %4.1f	ACT_SPEED = %4.1f	[rad/s]\n",\
 					omega_obj.omegaL, omega.omegaL);
-	printf ("			USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
+	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
 					power.powL, (MOTORS_PWM_MAX/255.0)*100.0);
 	
 	return;
@@ -161,6 +162,7 @@ void show_info_lcd (void)
 	stdout = &_LCD_;
 	
 	printf ("Time %.1f [s]\naZ %.2f [m/s^2]\n", time, mpu6050_accel.aZ);
+//	printf ("Time %.1f [s]\n\n", time);
 	time += 0.5;
 	
 	return;
@@ -168,73 +170,46 @@ void show_info_lcd (void)
 
 void show_info_7seg (void)
 {
-	uint8_t what2show;
-
-// 	extern uint8_t i2c_collisions;
-// 	extern uint8_t rtos_i_max;
-//	extern uint8_t rtos_tail_max;
-
-// 	MPU6050_ACCEL_DATA accel_data = mpu6050_get_accel_data ();
-// 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro_data ();
-	MOTOR_OMEGA_DATA omega = motors_get_omega ();
-	MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
-	MOTOR_POWER_DATA power = motors_get_power ();
+ 	MPU6050_ACCEL_DATA accel_data = mpu6050_get_accel ();
+// 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
+// 	MOTOR_OMEGA_DATA omega = motors_get_omega ();
+// 	MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
+// 	MOTOR_POWER_DATA power = motors_get_power ();
 	
 	stdout = &_7SEG_;
 
 //	__motors_set_pwm (adc_val >> 2, 0);
 
 
-	if (!(BUTTON_PIN & (1 << BUT0)))
+	switch ((~BUTTON_PIN) & BUTTON_MSK)	// смотрим на "кнопочную" часть порта
 	{
-		what2show = 1;
-	}
-	else if (!(BUTTON_PIN & (1 << BUT2)))
-	{
-		what2show = 2;
-	}
-	else if (!(BUTTON_PIN & (1 << BUT3)))
-	{
-		what2show = 3;
-	}
-	else
-	{
-		what2show = 0;
-	}
-
-	switch (what2show)
-	{
-		case 0:
+		case 0:	// ничего не подключено
 		{
-			/*lcd_putc ('A');*/
 			/*printf ("a%3d\n", adc_val >> 2);*/
 			/*printf ("%4.1f\n", omega.omegaL);*/
-			printf ("o%4.1f\n", omega_obj.omegaL);
-			/*printf ("%d\n", __x_l);*/
+			/*printf ("o%4.1f\n", omega_obj.omegaL);*/
+			printf ("%4.1f\n", bmp180_get_dhdt ());
 			break;
 		}
-		case 1:
+		case (1 << BUT0):
 		{
 			/*printf ("t%3.1f\n", bmp180_get_T());*/
-			/*printf ("%d\n", __eps);*/
 			/*printf ("a%3d\n", adc_val >> 2);*/
-			printf ("%4.1f\n", omega.omegaL);
+			/*printf ("%4.1f\n", omega.omegaL);*/
+			printf ("%4.1f\n", bmp180_get_h ());
 			break;
 		}
-		case 2:
+		case (1 << BUT2):	// не ошибка, BUT1 пока не используется
 		{
 			/*printf ("%4.1f\n", bmp180_get_P_mmHg());*/
-			/*printf ("%d\n", (uint16_t)(__int_1 / 1000));*/
-			/*printf ("p%d\n", OCR1BL);*/
-			printf ("%4.1f\n", power.powL);
+			/*printf ("%4.1f\n", power.powL);*/
+			printf ("%d\n", (uint16_t)bmp180_get_P_hPa ());
 			break;
 		}
-		case 3:
+		case (1 << BUT3):
 		{
 			/*printf ("%4.1f\n", gyro_data.gZ);*/
-			/*printf ("%4.1f\n", accel_data.aZ);*/
-			/*printf ("%4.1f\n", bmp180_get_H(101325));*/
-			/*printf ("%d\n", (uint16_t)(__int_2 / 1000));*/
+			printf ("%4.1f\n", accel_data.aZ);
 			break;
 		}
 	}

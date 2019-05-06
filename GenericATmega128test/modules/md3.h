@@ -31,9 +31,11 @@ void led_r_blink (void);
 #define BUTTON_PORT	PORTB
 #define BUTTON_DDR	DDRB
 #define BUTTON_PIN	PINB
+#define BUTTON_MSK	0x0F	// для "кнопок" используется не весь порт
 
 #define BUT0	PB0
-#define BUT2	PB2	// не ошибка; на PB1 выход SCK, и на него лучше не вешать конденсатор
+#define BUT1	PB1 // на PB1 выход SCK, и на него лучше не вешать конденсатор
+#define BUT2	PB2	
 #define BUT3	PB3
 
 #define MD3_START_DELAY		2000	// ms, задержка перед аппаратной инициализацией всех модулей/интерфейсов

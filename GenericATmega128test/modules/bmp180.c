@@ -24,12 +24,23 @@ volatile unsigned long B4, B7;
 
 volatile long UT, UP, p;
 
-volatile long bmp180_T = 0, bmp180_P = 0;
-volatile float bmp180_H = 0;
+long bmp180_T = 0, bmp180_P = 0, bmp180_P0 = 101325; // P0 ещё будет меняться по требованию пользователя
+float bmp180_H = 0;
 
 /* Область переменных из модуля i2c.c */
 extern uint8_t i2c_read_buffer[I2C_MAX_READ_BYTES_COUNT];
 /**************************************/
+
+static uint8_t __estimator_reset = 1;	// флаг сброса интеграторов оценивателя;
+// static потому, что переменная с таким же именем используется в оценивателе в motor.c
+
+double __bmp180_dpdt = 0.0, __bmp180_dhdt = 0.0;
+
+double C1 = 44330.0, C2 = 0.19029, C3 = 4945.0;
+// Коэффициенты для барометрической формулы.
+// C3 ещё будет меняться в зависимости от P0; здесь C3 рассчитано для P0 = 101325 Па
+// Точное значение C2: 0.19029495718363463368220742150333
+
 
 inline void bmp180_init (void)
 {
@@ -174,15 +185,78 @@ void bmp180_calc_P (void)
 	X2 = (-7357 * p) >> 16;
 	bmp180_P = p + ((X1 + X2 + 3791) >> 4);	// в Па
 	
+	// Получили давление - прогоняем оцениватель dp/dt
+	rtos_set_task (bmp180_dpdt_estimator, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
+	
 	return;
 }
 
-double bmp180_get_H (long P0) 
+
+void bmp180_dpdt_estimator (void)
+{
+// Запускается следом за bmp180_calc_P.
+
+// Здесь оцениваем dP/dt. Это необходимо для дальнейшей оценки dh/dt в связи с тем, что
+// значения давления у нас уже есть, а каждый раз запрашивать bmp180_get_H - слишком сложно вычислительно.
+// Зная dp/dt, можем (по требованию пользователя) найти dh/dt:
+// dh/dt [t=t0] = -C3 * C2 * (P(t) [t=t0])^(C2-1) * dP/dt [t=t0], где
+// C1 = 44330;	C2 = 0.19029495718363463368220742150333...;	C3 = C1/(P0^C2); где
+// P0 - QNH/QFE/что душе угодно.
+
+	static double I1, I2;
+	double eps;
+
+	if (__estimator_reset)
+	{
+		// Инициализируем I1 = I2 = bmp180_P, чтобы в момент включения не было скачка;
+		// да и вообще полагаем, что в начале мы стоим на месте
+		
+		I1 = bmp180_P;
+		I2 = bmp180_P;
+	
+		__estimator_reset = 0;
+	}
+
+	/* I ступень: */
+	eps = (double)bmp180_P - I1;
+	eps *= BMP180_ESTIM_CONST_Ki;
+	I1 += eps * BMP180_ESTIM_CONST_dT;
+	/* II ступень: */
+	eps = I1 - I2;
+	eps *= BMP180_ESTIM_CONST_Ki;
+	__bmp180_dpdt = eps;
+	I2 += eps * BMP180_ESTIM_CONST_dT;
+	
+	return;
+}
+
+void bmp180_set_P0 (long P0)
+{
+	bmp180_P0 = P0;
+	
+	// изменение P0 требует пересчёта C3:
+	C3 = C1 / pow (bmp180_P0, C2);
+	
+	return;
+}
+
+double bmp180_get_h (void) 
 {	// P0 - стандартное давление, Па
 	if (bmp180_P)	// отдаём только если состоялось первое измерение, о чём говорит bmp180_P != 0
 	{
-		return (44330 * (1 - pow((double)bmp180_P / (double)P0, 0.19029)));
-		// вот степень: 0.19029495718363463368220742150333
+		return (44330 * (1 - pow ((double)bmp180_P / (double)bmp180_P0, 0.19029)));
+	}
+	else
+	{
+		return 0.0;
+	}
+}
+
+double bmp180_get_dhdt (void)
+{
+	if (bmp180_P)	// отдаём только если состоялось первое измерение, о чём говорит bmp180_P != 0,
+	{				// хотя для dh/dt это недостаточно сильное условие
+		return -C3 * C2 * pow ((double)bmp180_P, C2 - 1) * __bmp180_dpdt;
 	}
 	else
 	{
@@ -194,7 +268,7 @@ double bmp180_get_P_hPa (void)
 {
 	if (bmp180_P)	// отдаём только если состоялось первое измерение, о чём говорит bmp180_P != 0
 	{
-		return ((double)bmp180_P / 100);
+		return ((double)bmp180_P / 100.0);
 	}
 	else
 	{

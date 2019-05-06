@@ -13,8 +13,8 @@ inline void md3_init (void)
 {
 	LED_DDR		|=	(1 << LED_R) | (1 << LED_Y) | (1 << LED_G);
 	
-	BUTTON_DDR	&= ~((1 << BUT0) | (1 << BUT2)  | (1 << BUT3));		// и так 0, но на всякий случай
-	BUTTON_PORT |=	(1 << BUT0)	 | (1 << BUT2)  | (1 << BUT3);		// подтяжка
+	BUTTON_DDR	&= ~((1 << BUT0) | (1 << BUT2)  | (1 << BUT3));				// и так 0, но на всякий случай
+	BUTTON_PORT |=	(1 << BUT0)	| (1 << BUT1) | (1 << BUT2)  | (1 << BUT3);		// подтяжка
 	
 	led_r_on (); led_y_on (); led_g_on ();
 	_delay_ms (MD3_START_DELAY);

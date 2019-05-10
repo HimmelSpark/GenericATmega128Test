@@ -8,6 +8,8 @@
 #include "../general.h"
 #include "lcd.h"
 #include "../modules/md3.h"
+#include "../fifo.h"
+#include "../rtos.h"
 
 uint8_t __lcd_ac = 0x00;
 
@@ -17,17 +19,51 @@ uint8_t __lcd_4bit_enabled = 0; // изначально дисплей рабо�
 // 0x30 Initializing by Instruction отсылаются "по-восьмибитному", т.е. в один приём;
 // это будет учтено в __lcd_write_byte ()
 
+FIFO_BUFFER_t __lcd_data_buf, __lcd_mode_buf;
 
 void __lcd_write_byte (uint8_t mode, uint8_t data)
 {
-	uint8_t data_l, data_h;
+	// Режимы (запись данных/команд) и данные (байты) всегда пишем парами в два буфера:
+	fifo_push (mode, &__lcd_mode_buf);
+	fifo_push (data, &__lcd_data_buf);
+	
+	if (!__lcd_bf_readable)
+	{	// на этапе инициализации нельзя использовать RTOS, т.к. выдерживаем
+		// тупые задержки, не зная BUSY FLAG; поэтому сразу вызываем процедуру передачи
+		__lcd_tx_routine ();
+	}
+	else
+	{	
+		// ToDo: если не можем достучаться до дисплея достаточно долго, то
+		// нужно уже не ASAP, а например каждую секунду
+		rtos_set_task (__lcd_tx_routine, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
+	}
+	
+	return;
+}
 
-	// если можно прочитать флаг занятости, ждём
+void __lcd_tx_routine (void)
+{
+	uint8_t mode, data, data_l, data_h;
+	register uint8_t bf;
+
+	// если можно прочитать флаг занятости,
 	if (__lcd_bf_readable)
 	{
-		__lcd_busy_wait ();
+		bf = __lcd_read_bf ();	// читаем его
+		if (bf)	// и в случае занятости планируем эту процедуру ASAP
+		{
+			rtos_set_task (__lcd_tx_routine, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
+			return;		// и уходим отсюда до лучших времён
+		}
 	}
-	// в противном случае полагаем, что необходимые интервалы времени выдержаны
+	
+	// в противном случае полагаем, что необходимые интервалы времени выдержаны,
+	// забираем данные из буферов и выставляем их на шину данных
+	
+	// предполагается, что раз вызвали эту процедуру, то есть что передать
+	data = fifo_pop (&__lcd_data_buf);
+	mode = fifo_pop (&__lcd_mode_buf);
 	
 	data_l = data & 0x0F;	// младшие 4 бита
 	data_h = data >> 4;		// старшие 4 бита
@@ -62,8 +98,61 @@ void __lcd_write_byte (uint8_t mode, uint8_t data)
 	
 	__LCD_DB_HiZ;
 	
+	// Если ещё осталось что-то для записи, планируем эту процедуру ещё раз:
+	if (__lcd_data_buf.idxIn != __lcd_data_buf.idxOut)
+	{
+		rtos_set_task (__lcd_tx_routine, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
+	}
+	
 	return;
 }
+
+// void __lcd_write_byte (uint8_t mode, uint8_t data)
+// {
+// 	uint8_t data_l, data_h;
+// 
+// 	// если можно прочитать флаг занятости, ждём
+// 	if (__lcd_bf_readable)
+// 	{
+// 		__lcd_busy_wait ();
+// 	}
+// 	// в противном случае полагаем, что необходимые интервалы времени выдержаны
+// 	
+// 	data_l = data & 0x0F;	// младшие 4 бита
+// 	data_h = data >> 4;		// старшие 4 бита
+// 
+// 	__LCD_RW_LO;	// запись
+// 	
+// 	switch (mode)
+// 	{
+// 		case LCD_MODE_WR_CMD:
+// 		{
+// 			__LCD_RS_LO;
+// 			break;
+// 		}
+// 		case LCD_MODE_WR_DATA:
+// 		{
+// 			__LCD_RS_HI;
+// 			break;
+// 		}
+// 	}
+// 	
+// 	__LCD_DB_OUT;
+// 	LCD_DB_PORT |= data_h;
+// 	__lcd_strobe ();
+// 	
+// 	// если перешли в 4-битный режим, передаём младшую тетраду
+// 	if (__lcd_4bit_enabled)
+// 	{
+// 		__LCD_DB_PORT_LO;
+// 		LCD_DB_PORT |= data_l;
+// 		__lcd_strobe ();
+// 	}
+// 	
+// 	__LCD_DB_HiZ;
+// 	
+// 	return;
+// }
 
 uint8_t __lcd_read_bf (void)
 {
@@ -174,6 +263,9 @@ inline void __lcd_strobe (void)
 
 inline void lcd_init (void)
 {
+	fifo_init (&__lcd_data_buf, LCD_BUF_SIZE);
+	fifo_init (&__lcd_mode_buf, LCD_BUF_SIZE);
+	
 	LCD_E_DDR |= 1 << LCD_E;	// порт строба всегда на вывод
 	LCD_RS_DDR |= 1 << LCD_RS;	// RS всегда на вывод
 	LCD_RW_DDR |= 1 << LCD_RW;	// RW всегда на вывод
@@ -292,7 +384,7 @@ void lcd_setpos (uint8_t line, uint8_t pos)
 	return;
 }
 
-LCD_POS lcd_getpos(void)
+LCD_POS lcd_getpos (void)
 {
 	LCD_POS pos;
 	pos.line = __lcd_ac / LCD_LINEWIDTH;
@@ -308,7 +400,7 @@ void lcd_clr (void)
 	return;
 }
 
-void lcd_home(void)
+void lcd_home (void)
 {
 	__lcd_write_byte (LCD_MODE_WR_CMD, 1 << LCD_HOME);
 	

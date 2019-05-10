@@ -24,7 +24,8 @@ typedef struct {
 
 
 /*  Служебные функции  */
-void __lcd_write_byte (uint8_t mode, uint8_t data);		// запись команд/данных
+void __lcd_write_byte (uint8_t mode, uint8_t data);		// запись команд/данных в буфер
+void __lcd_tx_routine (void);		// непосредственная запись в LCD
 uint8_t __lcd_read_bf (void);		// возвращает  флаг занятости
 uint8_t __lcd_read_ac (void);		// возвращает adress counter
 void __lcd_set_ddram (uint8_t ad);	// прыг
@@ -77,6 +78,8 @@ void lcd_home (void);						// AC=0, shift=0. ВНИМАНИЕ! Выполняе�
 #define LCD_DDRAM_SIZE			80
 #define LCD_LINEWIDTH			40	// 80/2
 #define LCD_LINEWIDTH_USED		16	// сколько символов в строке будем использовать	
+
+#define LCD_BUF_SIZE			128	
 
 
 // Режимы передачи/чтения

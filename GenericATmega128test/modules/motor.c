@@ -16,8 +16,8 @@ volatile uint32_t __enc_L_pulses = 0;
 volatile uint32_t __enc_R_pulses = 0;
 // u32 хватит на ~3453 километра пути
 
-volatile uint8_t __enc_L_event = 0;	// что-то послышалось на входе от левого энкодера
-volatile uint8_t __enc_R_event = 0;	// что-то послышалось на входе от правого энкодера
+// volatile uint8_t __enc_L_event = 0;	// что-то послышалось на входе от левого энкодера
+// volatile uint8_t __enc_R_event = 0;	// что-то послышалось на входе от правого энкодера
 
 MOTOR_OMEGA_DATA __omega_objective;
 

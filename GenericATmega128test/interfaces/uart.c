@@ -9,10 +9,11 @@
 #include "uart.h"
 #include "../modules/md3.h"
 #include "../fifo.h"
-#include <util/atomic.h>
 
 // Буфер передачи:
 FIFO_BUFFER_t __uart_tx_buf;
+
+uint8_t __uart_ready = 0;
 
 
  void uart_init (void)
@@ -22,6 +23,8 @@ FIFO_BUFFER_t __uart_tx_buf;
 	UCSR0C |= (1 << UCSZ01) | (1 << UCSZ00); // Char size 8 bit
 	UCSR0B |= (UART_TX_ENABLE << TXEN0) | (UART_RX_ENABLE << RXEN0) | \
 				(UART_RXC_INT_ENABLE << RXCIE0);
+				
+	__uart_ready = 1;
 				
 	// Инициализируем FIFO-буфер (очередь) кольцевого типа
 	fifo_init (&__uart_tx_buf, UART_TX_BUF_SIZE);
@@ -35,6 +38,11 @@ FIFO_BUFFER_t __uart_tx_buf;
 
 int uart_stdputc (char c, FILE *stream)
 {	
+	if (!__uart_ready)
+	{
+		return 0;
+	}
+	
 	#if UART_INSERT_CR == 1
 		if (c == '\n')
 		{

@@ -42,11 +42,12 @@ void motors_set_omega (double omega_L, double omega_R); // Задать уста
 /* Служебные функции */
 void __enc_L (void);		// событие энкодера L (фаза 1)	ToDo: фаза 2
 void __enc_R (void);		// событие энкодера R (фаза 1)	ToDo: фаза 2
-//void __enc_filter (void);// решаем, засчитывать ли импульс
+void __enc_L_enable (void);		// разрешить чтение с энкодера L
+void __enc_R_enable (void);		// разрешить чтение с энкодера R
 void __motors_set_pwm (uint8_t duty_cycle_l, uint8_t duty_cycle_r);	// Задание скважности, 0 - 255
 void __motors_omega_estimator (void);	// оценка производной угла поворота для двух двигателей
 void __motors_pi_controller (void);		// ПИ-регулятор для двух двигателей
-void __motors_obj_poll (void);			// опрос задатчика скорости двигателя L (отладка)
+void __motors_obj_poll (void);			// опрос задатчика скорости двигателей (отладка)
 
 
 /* Аппаратная область */
@@ -72,17 +73,24 @@ void __motors_obj_poll (void);			// опрос задатчика скорост
 #define ENC_L_PIN		PIND2
 #define ENC_R_PIN		PIND3
 
+#define ENC_FILTER_TIME	500		// us; для фильтра ложных прерываний
+
+// /* Макросы управления прерываниями */
+// #define __ENC_L_ISR_ON		EIMSK |= 1 << INT2
+// #define __ENC_L_ISR_OFF		EIMSK &= ~(1 << INT2)
+// #define __ENC_R_ISR_ON		EIMSK |= 1 << INT3
+// #define __ENC_R_ISR_OFF		EIMSK &= ~(1 << INT3)
+
 /* Программная область */
-#define MOTORS_OM_OBJ_POLL	100	// опрос задатчика скорости каждые 100 мс
+#define MOTORS_OBJ_POLL_PERIOD	100	// опрос задатчика скорости каждые 100 мс
 
-#define MOTORS_PWM_MIN	25		// экспериментально установленный порог страгивания
-#define MOTORS_PWM_MAX	200		// ограничение сверху
+#define MOTORS_PWM_CONSTR_MIN	25		// экспериментально установленный порог страгивания
+#define MOTORS_PWM_CONSTR_MAX	200		// ограничение сверху
 
-//#define MOTORS_SPEED_OBJ_MIN		0.0		// рад/с
 #define MOTORS_SPEED_OBJ_MAX		40.0	// рад/с
 #define MOTORS_SPEED_OBJ_ADC_TRS	10		// мёртвая зона в единицах ADC
 
-#define MOTORS_STARTUP_TIME		1000	// ms; подождём секунду перед разрешением движения
+#define MOTORS_STARTUP_TIME		1000	// ms
 
 /* Область определений алгоритмов оценки/управления */
 
@@ -92,8 +100,6 @@ void __motors_obj_poll (void);			// опрос задатчика скорост
 #define ESTIM_CONST_Kp		1.9		// только для ПИ-фильтра
 //#define ESTIM_SCALE			1.5365	// °/имп
 #define ESTIM_SCALE			0.0268376	// рад/имп
-
-//#define SPIKE_FILTER_DELAY	10		// us
 
 #define PICONTR_PERIOD		10		// ms
 #define PICONTR_CONST_dT	0.01	// s

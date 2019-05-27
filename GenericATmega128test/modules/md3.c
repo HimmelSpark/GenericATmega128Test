@@ -23,6 +23,8 @@ inline void md3_init (void)
 	ADMUX	|= (1 << REFS0) | MD3_MUX_SELECT;
 	ADCSRA	|= (1 << ADEN) | (1 << ADSC) | (1 << ADFR) | MD3_ADC_PRESCALER;
 	
+	DEBUG_DDR |= 1 << DEBUG_PIN;
+	
 	rtos_set_task (led_g_switch, RTOS_RUN_ASAP, 500);
 }
 

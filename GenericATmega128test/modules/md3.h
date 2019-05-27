@@ -47,4 +47,12 @@ void led_r_blink (void);
 
 #define ADC_MAX				1024
 
+#define DEBUG_PORT		PORTE
+#define DEBUG_DDR		DDRE
+#define DEBUG_PIN		PE6
+
+#define __DEBUG_PIN_HIGH	DEBUG_PORT |= 1 << DEBUG_PIN
+#define __DEBUG_PIN_LOW		DEBUG_PORT &= ~(1 << DEBUG_PIN)
+#define __DEBUG_PIN_SWITCH	DEBUG_PORT ^= 1 << DEBUG_PIN
+
 #endif /* MD3_DEFS_H_ */

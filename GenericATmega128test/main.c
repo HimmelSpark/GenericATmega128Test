@@ -36,6 +36,7 @@ static FILE _LCD_	= FDEV_SETUP_STREAM (lcd_stdputc, NULL, _FDEV_SETUP_WRITE);
 static FILE _UART_	= FDEV_SETUP_STREAM (uart_stdputc, NULL, _FDEV_SETUP_WRITE);
 /**********************************/
 
+
 ISR (TWI_vect)
 {
 	__i2c_routine ();
@@ -46,28 +47,47 @@ ISR (USART0_UDRE_vect)
 	__uart_tx_routine ();
 }
 
-ISR (TIMER0_COMP_vect)	// служба таймеров; вызывается каждую 1 мс
-{// ToDo: решить на уровне RTOS проблему приоритетных задач!
+// ISR (TIMER0_COMP_vect)
+// {
+// 	// Служба таймеров ядра (вариант с TIMER0, если не используем XDIV;
+// 	// иначе TIMER0 работает только в асинхронном режиме - использовать TIMER2)	
+// 
+// 	// Временный костыль, решающий проблему равномерной по времени развёртки 7-сегментника:
+// 	__top_priority ();
+// 	// Сама служба
+// 	__rtos_timer_service ();
+// }
+
+ISR (TIMER2_COMP_vect)
+{
+	// Служба таймеров ядра (вариант с TIMER2, если используем XDIV,
+	// т.к. TIMER0 в таком случае работает только в асинхронном режиме)
+	
 	// Временный костыль, решающий проблему равномерной по времени развёртки 7-сегментника:
 	__top_priority ();
 	// Сама служба
 	__rtos_timer_service ();
 }
 
-// ISR (TIMER1_COMPA_vect) // грубый фильтр событий энкодеров (необязателен)
-// {
-// 	__enc_filter ();
-// }
+ISR (TIMER3_COMPB_vect) // разрешаем прерывания энкодера L
+{
+	__enc_L_enable ();
+}
 
-ISR (INT2_vect)			// прерывание энкодера motor_l
+ISR (TIMER3_COMPC_vect) // разрешаем прерывания энкодера R
+{
+	__enc_R_enable ();
+}
+
+ISR (INT2_vect)			// прерывание энкодера L
 {
 	__enc_L ();
 }
 
-// ISR (INT3_vect)			// прерывание энкодера motor_r
-// {
-// 	__enc_R ();
-// }
+ISR (INT3_vect)			// прерывание энкодера R
+{
+	__enc_R ();
+}
 
 int main (void)
 {
@@ -90,9 +110,9 @@ int main (void)
 	
 	rtos_set_task (show_info_7seg, 1000, 100);
 	rtos_set_task (show_info_uart, 1000, 200);
-	rtos_set_task (show_info_lcd, 1000, 500);
+	rtos_set_task (show_info_lcd, 1000, 100);
 	
-	rtos_set_task (bmp180_init, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
+	rtos_set_task (bmp180_init, 1, RTOS_RUN_ONCE);
 	rtos_set_task (mpu6050_init, 200, RTOS_RUN_ONCE);
 	
 	sei ();
@@ -149,8 +169,12 @@ void show_info_uart (void)
 	printf ("MOTOR_L:	TGT_SPEED = %4.1f	ACT_SPEED = %4.1f	[rad/s]\n",\
 					omega_obj.omegaL, omega.omegaL);
 	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
-					power.powL, (MOTORS_PWM_MAX/255.0)*100.0);
-	
+					power.powL, (MOTORS_PWM_CONSTR_MAX/255.0)*100.0);
+	printf ("MOTOR_R:	TGT_SPEED = %4.1f	ACT_SPEED = %4.1f	[rad/s]\n",\
+					omega_obj.omegaR, omega.omegaR);
+	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
+					power.powR, (MOTORS_PWM_CONSTR_MAX/255.0)*100.0);
+					
 	return;
 }
 
@@ -163,7 +187,7 @@ void show_info_lcd (void)
 	
 	printf ("Time %.1f [s]\naZ %.2f [m/s^2]\n", time, mpu6050_accel.aZ);
 //	printf ("Time %.1f [s]\n\n", time);
-	time += 0.5;
+	time += 0.1;
 	
 	return;
 }
@@ -171,14 +195,12 @@ void show_info_lcd (void)
 void show_info_7seg (void)
 {
  	MPU6050_ACCEL_DATA accel_data = mpu6050_get_accel ();
-// 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
-// 	MOTOR_OMEGA_DATA omega = motors_get_omega ();
+ 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
+ 	MOTOR_OMEGA_DATA omega = motors_get_omega ();
 // 	MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
 // 	MOTOR_POWER_DATA power = motors_get_power ();
 	
 	stdout = &_7SEG_;
-
-//	__motors_set_pwm (adc_val >> 2, 0);
 
 
 	switch ((~BUTTON_PIN) & BUTTON_MSK)	// смотрим на "кнопочную" часть порта
@@ -186,30 +208,28 @@ void show_info_7seg (void)
 		case 0:	// ничего не подключено
 		{
 			/*printf ("a%3d\n", adc_val >> 2);*/
-			/*printf ("%4.1f\n", omega.omegaL);*/
-			/*printf ("o%4.1f\n", omega_obj.omegaL);*/
-			printf ("%4.1f\n", bmp180_get_dhdt ());
+			printf ("%4.1f\n", omega.omegaL);
+			/*printf ("%4.1f\n", bmp180_get_dhdt ());*/
 			break;
 		}
 		case (1 << BUT0):
 		{
 			/*printf ("t%3.1f\n", bmp180_get_T());*/
 			/*printf ("a%3d\n", adc_val >> 2);*/
-			/*printf ("%4.1f\n", omega.omegaL);*/
-			printf ("%4.1f\n", bmp180_get_h ());
+			printf ("%4.1f\n", omega.omegaR);
+			/*printf ("%4.1f\n", bmp180_get_h ());*/
 			break;
 		}
 		case (1 << BUT2):	// не ошибка, BUT1 пока не используется
 		{
-			/*printf ("%4.1f\n", bmp180_get_P_mmHg());*/
 			/*printf ("%4.1f\n", power.powL);*/
-			printf ("%d\n", (uint16_t)bmp180_get_P_hPa ());
+			printf ("%.1f\n", bmp180_get_P_mmHg ());
 			break;
 		}
 		case (1 << BUT3):
 		{
-			/*printf ("%4.1f\n", gyro_data.gZ);*/
-			printf ("%4.1f\n", accel_data.aZ);
+			printf ("%4.1f\n", gyro_data.gZ);
+			/*printf ("%4.1f\n", accel_data.aZ);*/
 			break;
 		}
 	}

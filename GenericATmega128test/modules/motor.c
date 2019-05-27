@@ -27,75 +27,71 @@ double __omega_L_raw = 0.0, __omega_R_raw = 0.0;	// оценки произво�
 static uint8_t __estimator_reset = 1;	// флаг сброса интеграторов оценивателя;
 // static потому, что переменная с таким же именем используется в оценивателе в bmp180.c
 uint8_t __picontroller_reset	= 1;	// флаг сброса интеграторов регулятора
-/*uint8_t __picontroller_active	= 0;	// флаг работы ПИ-регулятора*/
-uint8_t __motor_L_reached_max	= 0;	// флаг достижения L двигателем ограничения PWM
-uint8_t __motor_R_reached_max	= 0;	// флаг достижения R двигателем ограничения PWM
+uint8_t __motor_L_reached_constr	= 0;	// флаг достижения L двигателем ограничения PWM
+uint8_t __motor_R_reached_constr	= 0;	// флаг достижения R двигателем ограничения PWM
 
+volatile uint8_t __enc_L_en = 1, __enc_R_en = 1;	// разрешение чтения энкодеров
 
 inline void __enc_L (void)
 {	// ISR
-	__enc_L_pulses++;
+	__DEBUG_PIN_SWITCH;
+	if (__enc_L_en)
+	{
+		__enc_L_en = 0;
+		__enc_L_pulses++;
 	
-// 	if (__enc_L_event)
-// 	{
-// 		return;
-// 	}
-// 	
-// 	__enc_L_event = 1;
-// 	OCR1A = TCNT1 + SPIKE_FILTER_DELAY * 8;	// 8 тиков / мкс;
-// 	TIMSK |= (1 << OCIE1A);					// скоро проверим, был это шум или полезный сигнал
-	
+		// Через некоторое время (не более 500 мкс) разрешим чтение:
+		OCR3B = TCNT3 + (uint16_t)ENC_FILTER_TIME; // мкс
+		ETIMSK |= 1 << OCIE3B;	// прерывание по совпадению с OCR3B
+	}
+
 	return;
 }
 inline void __enc_R (void)
 {	// ISR
-	__enc_R_pulses++;
-	
-// 	if (__enc_R_event)
-// 	{
-// 		return;
-// 	}
-// 	
-// 	__enc_R_event = 1;
-// 	OCR1A = TCNT1 + SPIKE_FILTER_DELAY * 8;	// 8 тиков / мкс;
-// 	TIMSK |= (1 << OCIE1A);					// скоро проверим, был это шум или полезный сигнал
+
+	if (__enc_R_en)
+	{
+		__enc_R_en = 0;
+		__enc_R_pulses++;
+		
+		// Через некоторое время (не более 500 мкс) разрешим чтение:
+		OCR3C = TCNT3 + (uint16_t)ENC_FILTER_TIME; // мкс
+		ETIMSK |= 1 << OCIE3C;	// прерывание по совпадению с OCR3C
+	}
+
+	return;
+}
+
+inline void __enc_L_enable (void)
+{// ISR
+	__enc_L_en = 1;
+	ETIMSK &= ~(1 << OCIE3B);	// это прерывание больше не нужно
 	
 	return;
 }
 
-// inline void __enc_filter (void)
-// {	// ISR
-// 	if (__enc_L_event && (ENCODERS_PIN & (1 << ENC_L_PIN)))
-// 	{	// было событие и уровень ещё высокий => тру сигнал
-// 		__enc_L_pulses++;
-// 	}
-// 	
-// 	if (__enc_R_event && (ENCODERS_PIN & (1 << ENC_R_PIN)))
-// 	{	// было событие и уровень ещё высокий => тру сигнал
-// 		__enc_R_pulses++;
-// 	}
-// 	
-// 	__enc_L_event = 0;
-// 	__enc_R_event = 0;
-// 	
-// 	TIMSK &= ~(1 << OCIE1A);	// больше не нужно проверять
-// 	
-// 	return;
-// }
+inline void __enc_R_enable (void)
+{// ISR
+	__enc_R_en = 1;
+	ETIMSK &= ~(1 << OCIE3C);	// это прерывание больше не нужно
+	
+	return;
+}
 
 void __motors_set_pwm (uint8_t duty_cycle_l, uint8_t duty_cycle_r)
 {
 	OCR1BL = duty_cycle_l;	// Только LOW, т.к. разрешение 8 бит
 	OCR1CL = duty_cycle_r;	// Только LOW, т.к. разрешение 8 бит
 
-	if (duty_cycle_l == MOTORS_PWM_MAX)
+	if (duty_cycle_l >= MOTORS_PWM_CONSTR_MAX)
 	{
-		__motor_L_reached_max = 1;
+		__motor_L_reached_constr = 1;
 	}
 	
-	if (duty_cycle_r == MOTORS_PWM_MAX)
+	if (duty_cycle_r >= MOTORS_PWM_CONSTR_MAX)
 	{
-		__motor_R_reached_max = 1;
+		__motor_R_reached_constr = 1;
 	}
 	
 	return;
@@ -112,15 +108,15 @@ void __motors_omega_estimator (void)
 
 */
 
-	static double I1L, I2L;//, I2R, I2L;
-	double epsL;//, epsR;
+	static double I1L, I2L, I1R, I2R;
+	double epsL, epsR;
 	
 	if (__estimator_reset)
 	{
 		I1L = 0;
 		I2L = 0;
-// 		I1R = 0;
-// 		I2R = 0;
+		I1R = 0;
+		I2R = 0;
 		
 		__estimator_reset = 0;
 	}
@@ -130,7 +126,7 @@ void __motors_omega_estimator (void)
 	ATOMIC_BLOCK (ATOMIC_RESTORESTATE)
 	{
 		epsL = (double)__enc_L_pulses - I1L;
-//		epsR = (double)__enc_R_pulses - I1R;
+		epsR = (double)__enc_R_pulses - I1R;
 	}
 	
 	/* Вычисления для двигателя L */
@@ -142,14 +138,14 @@ void __motors_omega_estimator (void)
 	__omega_L_raw = epsL;
 	I2L += epsL * ESTIM_CONST_dT;
 	
-// 	/* Вычисления для двигателя R */
-// 	epsR *= ESTIM_CONST_Ki;
-// 	I1R += epsR * ESTIM_CONST_dT;
-// 	/* II ступень: */
-// 	epsR = I1R - I2R;
-// 	epsR *= ESTIM_CONST_Ki;
-// 	__omega_R_raw = epsR;
-// 	I2R += epsR * ESTIM_CONST_dT;
+	/* Вычисления для двигателя R */
+	epsR *= ESTIM_CONST_Ki;
+	I1R += epsR * ESTIM_CONST_dT;
+	/* II ступень: */
+	epsR = I1R - I2R;
+	epsR *= ESTIM_CONST_Ki;
+	__omega_R_raw = epsR;
+	I2R += epsR * ESTIM_CONST_dT;
 	
 	return;
 }
@@ -220,22 +216,17 @@ void __motors_omega_estimator (void)
 
 void __motors_pi_controller (void)
 {
-	static double I_L;//, I_R;
-	double eps_L;//, eps_R;
+	static double I_L, I_R;
+	double eps_L, eps_R;
 	
-	static int16_t u_L;//, u_R;	// учитываем знак, т.к. он может появиться
-	
-// 	if (!__picontroller_active)
-// 	{
-// 		return;
-// 	}
+	static int16_t u_L, u_R;	// учитываем знак, т.к. он может появиться
 		
 	MOTOR_OMEGA_DATA omega = motors_get_omega ();
 	
 	if (__picontroller_reset)
 	{
 		I_L = 0;
-//		I_R = 0;
+		I_R = 0;
 		
 		__picontroller_reset = 0;
 	}
@@ -249,67 +240,68 @@ void __motors_pi_controller (void)
 	else
 	{
 		eps_L = __omega_objective.omegaL - omega.omegaL;
-		if (__motor_L_reached_max && (eps_L >= 0))
-		{	// достигли маскимума и снижения не предвидится
-			led_y_on ();	// ашипка
-			// а значение выхода останется предыдущим (ибо static)
+		if (__motor_L_reached_constr && (eps_L >= 0))
+		{	// достигли ограничения ШИМ, и снижения не предвидится
+			led_y_on ();	// master caution
 		}
 		else
-		{	// всё ок
-			if (__motor_L_reached_max)
-			{	// если ещё не сбросили ошибку, делаем это сейчас
-				__motor_L_reached_max = 0;
+		{
+			if (__motor_L_reached_constr)
+			{	// сбрасываем ошибку:
+				__motor_L_reached_constr = 0;
 				led_y_off ();
 			}
 			
 			I_L +=  eps_L * PICONTR_CONST_dT;
 			u_L = (int16_t)(eps_L * PICONTR_CONST_Kp + I_L * PICONTR_CONST_Ki);
-			if (u_L < MOTORS_PWM_MIN)
+			
+			if (u_L < MOTORS_PWM_CONSTR_MIN)
 			{
-				u_L = MOTORS_PWM_MIN;
+				u_L = MOTORS_PWM_CONSTR_MIN;
 			}
-			else if (u_L > MOTORS_PWM_MAX)
+			else if (u_L > MOTORS_PWM_CONSTR_MAX)
 			{
-				u_L = MOTORS_PWM_MAX;
+				u_L = MOTORS_PWM_CONSTR_MAX;
 			}
 		}
 	}
-	/* Вычисления для двигателя R */
-// 	if (__speed_objective.omegaR == 0)
-// 	{
-// 		u_R = 0;	// лучший способ остановиться
-// 		I_R = 0;	// при следующем трогании с места начнём с чистого листа
-// 	}
-// 	else
-// 	{
-// 		eps_R = __speed_objective.omegaR - omega.omegaR;
-// 		if (__motor_R_reached_max && (eps_R >= 0))
-// 		{	// достигли маскимума и снижения не предвидится
-// 			led_y_on();	// ашипка
-// 			// а значение выхода останется предыдущим (ибо static)
-// 		}
-// 		else
-// 		{	// всё ок
-// 			if (__motor_R_reached_max)
-// 			{	// если ещё не сбросили ошибку, делаем это сейчас
-// 				__motor_R_reached_max = 0;
-// 				led_y_off ();
-// 			}
-// 			I_R +=  eps_R * PICONTR_CONST_dT;
-// 			u_R = (int16_t)(eps_R * PICONTR_CONST_Kp + I_R * PICONTR_CONST_Ki);
-// 			if (u_R < MOTORS_PWM_MIN)
-// 			{
-// 				u_R = MOTORS_PWM_MIN;
-// 			}
-// 			else if (u_R > MOTORS_PWM_MAX)
-// 			{
-// 				u_R = MOTORS_PWM_MAX;
-// 			}
-// 		}
-// 	}
 	
-//	__motors_set_pwm ((uint8_t)u_L, (uint8_t)u_R);
-	__motors_set_pwm ((uint8_t)u_L, (uint8_t)0);
+	/* Вычисления для двигателя R */
+	if (__omega_objective.omegaR == 0)
+	{
+		u_R = 0;	// лучший способ остановиться
+		I_R = 0;	// при следующем трогании с места начнём с чистого листа
+	}
+	else
+	{
+		eps_R = __omega_objective.omegaR - omega.omegaR;
+		if (__motor_R_reached_constr && (eps_R >= 0))
+		{	// достигли ограничения ШИМ, и снижения не предвидится
+			led_y_on();	// master caution
+		}
+		else
+		{
+			if (__motor_R_reached_constr)
+			{	// сбрасываем ошибку:
+				__motor_R_reached_constr = 0;
+				led_y_off ();
+			}
+			
+			I_R +=  eps_R * PICONTR_CONST_dT;
+			u_R = (int16_t)(eps_R * PICONTR_CONST_Kp + I_R * PICONTR_CONST_Ki);
+			
+			if (u_R < MOTORS_PWM_CONSTR_MIN)
+			{
+				u_R = MOTORS_PWM_CONSTR_MIN;
+			}
+			else if (u_R > MOTORS_PWM_CONSTR_MAX)
+			{
+				u_R = MOTORS_PWM_CONSTR_MAX;
+			}
+		}
+	}
+	
+	__motors_set_pwm ((uint8_t)u_L, (uint8_t)u_R);
 	
 	return;
 }
@@ -318,19 +310,24 @@ void __motors_obj_poll (void)
 {
 	uint16_t adc_val = ADC;
 	
-	// Задаём уставку скорости в зависимости от положения потенциометра:
+	// Задаём уставку скорости (двух двигателей одновременно, отладка)
+	// в зависимости от положения потенциометра:
 	
 	if (adc_val <= MOTORS_SPEED_OBJ_ADC_TRS)
 	{// Если меньше порога, то ноль
 		__omega_objective.omegaL = 0;
+		__omega_objective.omegaR = 0;
 	}
 	else
 	{
 		__omega_objective.omegaL = (MOTORS_SPEED_OBJ_MAX/(ADC_MAX - MOTORS_SPEED_OBJ_ADC_TRS)) * \
 		((double)adc_val - MOTORS_SPEED_OBJ_ADC_TRS);
+		__omega_objective.omegaR = __omega_objective.omegaL; // только отладка
 	}
 	
-	motors_set_omega (__omega_objective.omegaL, 0);
+	motors_set_omega (__omega_objective.omegaL, __omega_objective.omegaR);
+
+//	__motors_set_pwm (adc_val >> 2, adc_val >> 2);
 	
 	return;
 }
@@ -344,7 +341,10 @@ inline void motors_init (void)
 	TCCR1A |=  (1 << COM1B1) | (1 << COM1C1) | (1 << WGM10);		// Fast
 	TCCR1B |= (1 << WGM12);											// PWM
 	/* Настройка прерываний энкодеров (rising edge) */
-	EICRA |= (0 << ISC31) | (0 << ISC30) | (1 << ISC21) | (1 << ISC20);
+	EICRA |= (1 << ISC31) | (1 << ISC30) | (1 << ISC21) | (1 << ISC20);
+	
+	/* Запуск таймера фильтра ложных прерываний */
+	TCCR3B |= (0 << CS32) | (1 << CS31) | (0 << CS30);	// счёт каждую 1 мкс
 	
 	rtos_set_task (motors_arm, MOTORS_STARTUP_TIME, RTOS_RUN_ONCE);
 	
@@ -360,15 +360,14 @@ void motors_arm (void)
 	TCCR1B |= (0 << CS12) | (0 << CS11) | (1 << CS10);	// запуск таймера
 	
 	/* Включение прерываний датчиков */
-	EIMSK |= (1 << INT2) | (0 << INT3);
+	EIMSK |= (1 << INT2) | (1 << INT3);
 	
 	__estimator_reset = 1;	// всё сбрасываем и оцениваем скорость с чистого листа
 	rtos_set_task (__motors_omega_estimator, RTOS_RUN_ASAP, ESTIM_PERIOD);
 	
-	rtos_set_task (__motors_obj_poll, RTOS_RUN_ASAP, MOTORS_OM_OBJ_POLL);
+	rtos_set_task (__motors_obj_poll, RTOS_RUN_ASAP, MOTORS_OBJ_POLL_PERIOD);
 	
 	__picontroller_reset = 1;
-	/*__picontroller_active = 1;*/
 	rtos_set_task (__motors_pi_controller, RTOS_RUN_ASAP, PICONTR_PERIOD);
 
 	uart_puts ("[ OK ] Motors armed\n");
@@ -380,15 +379,16 @@ void motors_disarm (void)
 {	
 	rtos_delete_task (__motors_obj_poll);
 	motors_set_omega (0.0, 0.0);
-	/*__picontroller_active = 0;*/
+	
 	rtos_delete_task (__motors_pi_controller);
 	
 	rtos_delete_task (__motors_omega_estimator);
 	
 	/* Выключение прерываний датчиков */
 	EIMSK &= ~((1 << INT3) | (1 << INT2));
-	/* Настройка PWM */
-	TCCR1B &= ~((1 << CS10) | (1 << CS11) | (1 << CS12));	// отключение любых источников тактирования
+	/* Отключение любых источников тактирования */
+	TCCR1B &= ~((1 << CS10) | (1 << CS11) | (1 << CS12));
+	
 	__motors_set_pwm (0, 0);
 	
 	return;
@@ -399,6 +399,7 @@ MOTOR_OMEGA_DATA motors_get_omega (void)
 	MOTOR_OMEGA_DATA omega;
 	omega.omegaL = __omega_L_raw * ESTIM_SCALE;
 	omega.omegaR = __omega_R_raw * ESTIM_SCALE;
+	
 	return omega;
 }
 
@@ -407,6 +408,7 @@ MOTOR_OMEGA_DATA motors_get_omega_obj (void)
 	MOTOR_OMEGA_DATA omega;
 	omega.omegaL = __omega_objective.omegaL;
 	omega.omegaR = __omega_objective.omegaR;
+	
 	return omega;
 }
 
@@ -415,6 +417,7 @@ MOTOR_POWER_DATA motors_get_power (void)
 	MOTOR_POWER_DATA power;
 	power.powL = ((float)OCR1BL / 255.0) * 100.0;
 	power.powR = ((float)OCR1CL / 255.0) * 100.0;
+	
 	return power;
 }
 

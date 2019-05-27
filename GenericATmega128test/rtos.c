@@ -13,8 +13,8 @@ uint8_t	__debug__set_task_errors = 0,
 		__debug__set_queue_errors = 0;
 
 //ОЧЕРЕДЬ функций (задач) для выполнения
-static volatile rtos_fptr_t __rtos_queue[RTOS_MAX_QUEUE_SIZE];
-static volatile uint8_t queue_tail = 0;	// первая свободная позиция очереди функций (задач)
+static volatile rtos_fptr_t __rtos_queue[RTOS_QUEUE_SIZE];
+static volatile uint8_t queue_tail = 0; // первая свободная позиция очереди функций (задач)
 
 //МАССИВ задач (таймеров), ожидающих своего времени выполнения
 static volatile rtos_task_t __rtos_pending_tasks[RTOS_MAX_PENDING_TSKs];
@@ -60,7 +60,7 @@ inline void __rtos_timer_service (void)
 		
 		if (__rtos_pending_tasks[i].delay == 0)	// задача готова к выполнению
 		{
-			if (queue_tail == RTOS_MAX_QUEUE_SIZE)	// если очередь полна,
+			if (queue_tail == RTOS_QUEUE_SIZE)	// если очередь полна,
 			{			// то значит, в этом вызове ISR ничего не поменяется
 				break;	// и смело можно выходить, в следующий раз повезёт. А пока не удаляем.
 			}
@@ -106,12 +106,19 @@ void __rtos_idle (void)
 
 inline void rtos_init (void)
 {
-	OCR0 = 125;					// 125=тиков в 1 мс
-	TCCR0 |= (1 << CS02) | (0 << CS01) | (0 << CS00) | (1 << WGM01) | (0 << WGM00);
-	// запуск таймера0, prescaler = /64; очитка TCNT при совпадении
-	TIMSK |= (1 << OCIE0);		// прерывания при совпадении с OCR0
+	// Вариант инициализации для TIMER0 (НЕ используем XDIV):
+// 	OCR0 = 125;		// 125=тиков в 1 мс
+// 	TCCR0 |= (1 << WGM01) | (1 << CS02) | (0 << CS01) | (0 << CS00);
+// 	// запуск таймера0, prescaler = /64; очитка TCNT при совпадении
+// 	TIMSK |= (1 << OCIE0);		// прерывания при совпадении с OCR0
+
+	// Вариант инициализации для TIMER2 (используем XDIV):
+	OCR2 = 125;		// 125=тиков в 1 мс
+	TCCR2 |= (1 << WGM21) | (0 << CS22) | (1 << CS21) | (1 << CS20);
+	// запуск таймера2, prescaler = /64; очитка TCNT при совпадении
+	TIMSK |= (1 << OCIE2);		// прерывания при совпадении с OCR2
 	
-	for (int i = 0; i < RTOS_MAX_QUEUE_SIZE; i++)
+	for (int i = 0; i < RTOS_QUEUE_SIZE; i++)
 	{
 		__rtos_queue[i] = __rtos_idle;
 	}
@@ -119,6 +126,7 @@ inline void rtos_init (void)
 	{
 		__rtos_null_task (i);
 	}
+	
 	return;
 }
 
@@ -164,23 +172,6 @@ void rtos_set_task (rtos_fptr_t func, uint16_t delay, uint16_t period)
 // RESTORE INTERRUPTS
 	return;
 }
-
-//void rtos_freeze_task (rtos_fptr_t func)
-//{
-//// DISABLE INTERRUPTS
-	//ATOMIC_BLOCK (ATOMIC_RESTORESTATE)
-	//{
-		//for (uint8_t i = 0; i < RTOS_MAX_PENDING_TSKs; i++)
-		//{
-			//if (__rtos_pending_tasks[i].func == func)	// нашли индекс задачи для удаления
-			//{
-				//__rtos_pending_tasks[i].freeze = RTOS_TSK_FREEZE;	// заморозили задачу по её индексу
-				//break;											// и больше делать здесь нечего
-			//}
-		//}		
-	//}
-//// RESTORE INTERRUPTS
-//}
 
 void rtos_delete_task (rtos_fptr_t func)
 {	

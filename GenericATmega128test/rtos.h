@@ -14,7 +14,6 @@
 
 typedef void (*rtos_fptr_t)(void);	// тип указателя на функцию
 
-// ToDo: Freeze-флаг
 typedef struct {
 	rtos_fptr_t func;
 	uint16_t delay;
@@ -30,18 +29,14 @@ void __rtos_idle (void);
 /*********************/
 
 /* Функции для пользователя */
-extern void rtos_init (void);	// Инициализация очереди и массива задач
-extern void rtos_set_task (rtos_fptr_t func, uint16_t delay, uint16_t period);	// Создание/обновление задачи
-//extern void rtos_freeze_task(rtos_fptr_t func);	//ToDo Заморозка задачи
-extern void rtos_delete_task (rtos_fptr_t func);	// Удаление (очистка) задачи
+void rtos_init (void);	// Инициализация очереди и массива задач
+void rtos_set_task (rtos_fptr_t func, uint16_t delay, uint16_t period);	// Создание/обновление задачи
+void rtos_delete_task (rtos_fptr_t func);	// Удаление (очистка) задачи
 /****************************/
-
-
 
 #define RTOS_RUN_ONCE				0	// задача одноразовая
 #define RTOS_RUN_ASAP				0	// с нулевой задержкой
-#define RTOS_MAX_QUEUE_SIZE			32	// функции в очереди
+#define RTOS_QUEUE_SIZE				32	// размер обычной очереди
 #define RTOS_MAX_PENDING_TSKs		32	// задачи, ожидающие выполнения
-
 
 #endif /* RTOS_H_ */

@@ -75,12 +75,6 @@ void __motors_obj_poll (void);			// опрос задатчика скорост
 
 #define ENC_FILTER_TIME	500		// us; для фильтра ложных прерываний
 
-// /* Макросы управления прерываниями */
-// #define __ENC_L_ISR_ON		EIMSK |= 1 << INT2
-// #define __ENC_L_ISR_OFF		EIMSK &= ~(1 << INT2)
-// #define __ENC_R_ISR_ON		EIMSK |= 1 << INT3
-// #define __ENC_R_ISR_OFF		EIMSK &= ~(1 << INT3)
-
 /* Программная область */
 #define MOTORS_OBJ_POLL_PERIOD	100	// опрос задатчика скорости каждые 100 мс
 
@@ -103,7 +97,7 @@ void __motors_obj_poll (void);			// опрос задатчика скорост
 
 #define PICONTR_PERIOD		10		// ms
 #define PICONTR_CONST_dT	0.01	// s
-#define PICONTR_CONST_Kp	3.0
+#define PICONTR_CONST_Kp	5.0
 #define PICONTR_CONST_Ki	10.0
 
 

@@ -15,13 +15,20 @@ uint8_t mpu6050_addr = (MPU6050_ADDR_MSBs << 1) | MPU6050_ADDR_LSB;
 
 volatile int16_t mpu6050_T = 0xFFFF; // "сырая" температура
 // вычисление истинной: Т = (float)mpu6050_T/340.0 + 36.53
-// Сырые данные акс и гиро:
-volatile int16_t	mpu6050_accelX	= 0,
-					mpu6050_accelY	= 0,
-					mpu6050_accelZ	= 0,
-					mpu6050_gyroX	= 0,
-					mpu6050_gyroY	= 0,
-					mpu6050_gyroZ	= 0;
+// Сырые показания:
+static int16_t	mpu6050_accelX	= 0,
+				mpu6050_accelY	= 0,
+				mpu6050_accelZ	= 0,
+				mpu6050_gyroX	= 0,	mpu6050_gyroX_offset = 0,
+				mpu6050_gyroY	= 0,	mpu6050_gyroY_offset = 0,
+				mpu6050_gyroZ	= 0,	mpu6050_gyroZ_offset = 0;
+		
+// Сырые фильтрованные показания (ToDo: добавить остальные, + фильтры):
+static double	mpu6050_gyroZ_f = 0.0;
+					
+static uint8_t __filter_reset = 1;	// флаг сброса фильтра угловой скорости Z
+
+uint8_t __gyro_calib = 0;	// выставлены ли нули на гироскопах?
 
 /* Область переменных из модуля i2c.c */
 extern uint8_t i2c_write_buffer[I2C_MAX_WRITE_BYTES_COUNT];
@@ -87,6 +94,10 @@ void mpu6050_poweron (void)
 void poweron_exit (void)
 {
 	rtos_set_task (mpu6050_read, MPU6050_READ_STARTUP_TIME, MPU6050_READ_PERIOD);	// теперь готовы читать данные
+	rtos_set_task (mpu6050_gyro_filter, \
+					MPU6050_READ_STARTUP_TIME + MPU6050_READ_PERIOD, \
+					MPU6050_READ_PERIOD);	// запускаем фильтр
+	
 	return;
 }
 
@@ -110,6 +121,19 @@ void read_exit (void)
 	mpu6050_gyroX	= (i2c_read_buffer[8]  << 8)| i2c_read_buffer[9];
 	mpu6050_gyroY	= (i2c_read_buffer[10] << 8)| i2c_read_buffer[11];
 	mpu6050_gyroZ	= (i2c_read_buffer[12] << 8)| i2c_read_buffer[13];
+
+	if (!__gyro_calib)
+	{
+		mpu6050_gyroX_offset = mpu6050_gyroX;
+		mpu6050_gyroY_offset = mpu6050_gyroY;
+		mpu6050_gyroZ_offset = mpu6050_gyroZ;
+		
+		__gyro_calib = 1;
+	}
+	
+	mpu6050_gyroX -= mpu6050_gyroX_offset;
+	mpu6050_gyroY -= mpu6050_gyroY_offset;
+	mpu6050_gyroZ -= mpu6050_gyroZ_offset;
 	
 	return;
 }
@@ -129,7 +153,8 @@ MPU6050_GYRO_DATA mpu6050_get_gyro (void)
 	MPU6050_GYRO_DATA gyro_data;
 	gyro_data.gX = ((double)mpu6050_gyroX)/MPU6050_GYRO_SCALE;
 	gyro_data.gY = ((double)mpu6050_gyroY)/MPU6050_GYRO_SCALE;
-	gyro_data.gZ = ((double)mpu6050_gyroZ)/MPU6050_GYRO_SCALE;
+	/*gyro_data.gZ = ((double)mpu6050_gyroZ)/MPU6050_GYRO_SCALE;*/
+	gyro_data.gZ = ((double)mpu6050_gyroZ_f)/MPU6050_GYRO_SCALE;
 	
 	return gyro_data;
 }
@@ -144,4 +169,28 @@ float mpu6050_get_T (void)
 	{
 		return 0.0;
 	}
+}
+
+void mpu6050_gyro_filter (void)
+{	// Пока что фильтруем только Z-составляющую
+	
+	static double I1;//, I2;
+	double eps;
+	
+	if (__filter_reset)
+	{
+		I1 = mpu6050_gyroZ;
+//		I2 = mpu6050_gyroZ;
+		__filter_reset = 0;
+	}
+	
+	eps = ((double)mpu6050_gyroZ - I1) * FILT_CONST_Ki;
+	I1 += eps * FILT_CONST_dT;
+	
+// 	eps = (I1 - I2) * FILT_CONST_Ki;
+// 	I2 += eps * FILT_CONST_dT;
+	
+	mpu6050_gyroZ_f = I1;
+	
+	return;
 }

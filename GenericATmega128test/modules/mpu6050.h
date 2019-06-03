@@ -30,7 +30,9 @@ MPU6050_ACCEL_DATA mpu6050_get_accel (void);// возвращает структ
 MPU6050_GYRO_DATA mpu6050_get_gyro (void);	// возвращает структуру из 3-х компонент угловой скорости, °/с
 float mpu6050_get_T (void);
 
-/* exit-функции */
+void mpu6050_gyro_filter (void);	// апериодический фильтр угловой скорости
+
+/* exit-функции I2C */
 void init_set_exit (void);
 void read_exit (void);
 void poweron_exit (void);
@@ -50,7 +52,7 @@ void poweron_exit (void);
 
 /* Настройки модуля */
 #define MPU6050_SMPLRT_DIV_VAL	0x1F	// 8 bit; sample rate = 31.25 Hz (раз в 32 мс)
-#define MPU6050_DLPF_VAL		5		// 3 bit; DLPF enabled, gyro output rate = 1kHz (см. register map)
+#define MPU6050_DLPF_VAL		6		// 3 bit; DLPF enabled, gyro output rate = 1kHz (см. register map)
 #define MPU6050_FS_SEL_VAL		3		// 2 bit
 #define MPU6050_AFS_SEL_VAL		3		// 2 bit
 /********************/
@@ -108,7 +110,6 @@ void poweron_exit (void);
 #endif
 																						 
 #define MPU6050_DISP_ACCEL_AS_G	0		// отображать ускорение в единицах g (иначе в м/с^2)
-//#define CONST_G					9.8154	// m/s^2
 
  #if MPU6050_DISP_ACCEL_AS_G == 1
 	#if MPU6050_AFS_SEL_VAL == 0
@@ -132,6 +133,13 @@ void poweron_exit (void);
 	#endif
 #endif
 /**************************************************************************/
+
+
+/* Для алгоритма фильтра */
+
+#define FILT_CONST_Ki	5.0
+#define FILT_CONST_dT	(MPU6050_READ_PERIOD/1000.0)	// с
+#define FILT_PERIOD		MPU6050_READ_PERIOD				// мс, для RTOS
 
 
 #endif /* MPU6050_H_ */

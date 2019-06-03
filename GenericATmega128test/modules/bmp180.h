@@ -19,7 +19,7 @@ void bmp180_calc_P (void);		// расчёт давления
 void bmp180_dpdt_estimator (void);	// оценка скорости изменения давления [Па/с] (для дальнейшего пересчёта в 
 									// вертикальную скорость)
 
-void bmp180_set_P0 (long P0);	// установка давления
+void bmp180_set_P0 (long P0);	// установка давления, Па
 double bmp180_get_h (void);		// приведённая высота, метры
 double bmp180_get_dhdt (void);	// вертикальная скорость, м/с
 double bmp180_get_P_hPa (void);	// последнее измеренное давление, гПа
@@ -82,7 +82,7 @@ void read_UP_exit (void);
 #define BMP180_READ_PERIOD		100		// ms
 // Для оценивателя:
 #define BMP180_ESTIM_CONST_Ki	1.0
-#define BMP180_ESTIM_CONST_dT	0.1	// с, для алгоритма; вообще, dT = BMP180_READ_PERIOD/1000 !!!
+#define BMP180_ESTIM_CONST_dT	(BMP180_READ_PERIOD/1000.0)	// с
 
 
 #define BMP180_UT_READ_DELAY		5	// ms

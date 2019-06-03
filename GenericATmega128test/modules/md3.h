@@ -45,7 +45,7 @@ void led_r_blink (void);
 #define MD3_MUX_SELECT		0b00000	// выбор входа ADC (выбран ADC0 -> PF0 -> потенциометр)
 #define MD3_ADC_PRESCALER	0b111	// /128
 
-#define ADC_MAX				1024
+#define ADC_MAX				1023
 
 #define DEBUG_PORT		PORTE
 #define DEBUG_DDR		DDRE

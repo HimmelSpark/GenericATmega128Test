@@ -1,6 +1,11 @@
+.vs/
+GenericATmega128test/Debug/
+LCDmyTest/Debug/
+NewRTOS/Debug/
+UART_FIFO/Debug/
+UARTtest/Debug/
 
-GenericATmega128test/Debug/Размеры.txt
-.vs/GenericATmega128test/v14/.atsuo
+*.atsuo
 *.d
 *.o
 *.eep

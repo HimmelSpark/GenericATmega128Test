@@ -203,6 +203,12 @@
     <Compile Include="modules\mpu6050.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="motion_control.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="motion_control.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="rtos.c">
       <SubType>compile</SubType>
     </Compile>

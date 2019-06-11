@@ -20,23 +20,24 @@ void led_g_off (void);
 void led_g_switch (void);
 void led_y_blink (void);
 void led_r_blink (void);
+uint16_t md3_get_pot (void);	// положение потенциометра
 
 #define LED_PORT	PORTD
 #define LED_DDR		DDRD
 
-#define LED_R PD5
-#define LED_Y PD6
-#define LED_G PD7
+#define LED_R		PD5
+#define LED_Y		PD6
+#define LED_G		PD7
 
 #define BUTTON_PORT	PORTB
 #define BUTTON_DDR	DDRB
 #define BUTTON_PIN	PINB
 #define BUTTON_MSK	0x0F	// для "кнопок" используется не весь порт
 
-#define BUT0	PB0
-#define BUT1	PB1 // на PB1 выход SCK, и на него лучше не вешать конденсатор
-#define BUT2	PB2	
-#define BUT3	PB3
+#define BUT0		PB0
+#define BUT1		PB1 // на PB1 выход SCK, и на него лучше не вешать конденсатор
+#define BUT2		PB2	
+#define BUT3		PB3
 
 #define MD3_START_DELAY		2000	// ms, задержка перед аппаратной инициализацией всех модулей/интерфейсов
 									// (предполагается, что инициализация md3 - перед
@@ -45,11 +46,12 @@ void led_r_blink (void);
 #define MD3_MUX_SELECT		0b00000	// выбор входа ADC (выбран ADC0 -> PF0 -> потенциометр)
 #define MD3_ADC_PRESCALER	0b111	// /128
 
-#define ADC_MAX				1023
+#define MD3_POT_MAX			1000
+#define MD3_POT_TRS			23		// мёртвая зона (для исключения дребезга нуля)
 
-#define DEBUG_PORT		PORTE
-#define DEBUG_DDR		DDRE
-#define DEBUG_PIN		PE6
+#define DEBUG_PORT			PORTE
+#define DEBUG_DDR			DDRE
+#define DEBUG_PIN			PE6
 
 #define __DEBUG_PIN_HIGH	DEBUG_PORT |= 1 << DEBUG_PIN
 #define __DEBUG_PIN_LOW		DEBUG_PORT &= ~(1 << DEBUG_PIN)

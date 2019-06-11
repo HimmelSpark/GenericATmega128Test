@@ -88,8 +88,8 @@ void poweron_exit (void);
 
 /********************/
 
-#define MPU6050_STARTUP_TIME		300		// ms; от init до poweron
-#define MPU6050_READ_STARTUP_TIME	60		// ms; от poweron до первого read
+#define MPU6050_STARTUP_DELAY		300		// ms; от init до poweron
+#define MPU6050_READ_STARTUP_DELAY	60		// ms; от poweron до первого read
 #define MPU6050_READ_PERIOD			100		// ms
 
 #define MPU6050_WORD_SIZE		2	// байта на слово (для всех измерений)

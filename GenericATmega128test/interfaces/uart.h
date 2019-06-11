@@ -37,15 +37,15 @@ void __uart_rx_byte (void);			// обработчик прерывания дл�
 /**********************/
 
 
-#define UART_BAUDRATE	500000UL
+#define UART_BAUDRATE	9600UL
 #define	UART_UBRR		(F_CPU/(16*UART_BAUDRATE) - 1)
 
  
 #define UART_TX_BUF_SIZE	256
 
 #define UART_TX_ENABLE		1
-#define UART_RX_ENABLE		0
-#define UART_RXC_INT_ENABLE	0
+#define UART_RX_ENABLE		1
+#define UART_RXC_INT_ENABLE	1
 
 #define UART_INSERT_CR		1	// после \n вставляется \r
 

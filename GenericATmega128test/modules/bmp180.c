@@ -67,7 +67,7 @@ void read_params_exit (void)
 	MC	= (i2c_read_buffer[18]	<< 8)	| i2c_read_buffer[19];
 	MD	= (i2c_read_buffer[20]	<< 8)	| i2c_read_buffer[21];
 	
-	rtos_set_task (bmp180_start_UT, BMP180_READ_STARTUP, BMP180_READ_PERIOD);	// теперь готовы читать данные
+	rtos_set_task (bmp180_start_UT, BMP180_STARTUP_DELAY, BMP180_READ_PERIOD);	// теперь готовы читать данные
 	
 	return;
 }

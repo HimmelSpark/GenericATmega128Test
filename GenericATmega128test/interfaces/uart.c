@@ -9,12 +9,17 @@
 #include "uart.h"
 #include "../modules/md3.h"
 #include "../fifo.h"
+#include "../rtos.h"
+
+#include "../modules/motor.h"
+#include "../motion_control.h"
+
+extern void show_info_uart(void);
 
 // Буфер передачи:
 FIFO_BUFFER_t __uart_tx_buf;
 
-uint8_t __uart_ready = 0;
-
+uint8_t __uart_ready = 0;		// если UART не инициализирован, передача байтов будет запрещена
 
  void uart_init (void)
 {
@@ -26,7 +31,7 @@ uint8_t __uart_ready = 0;
 				
 	__uart_ready = 1;
 				
-	// Инициализируем FIFO-буфер (очередь) кольцевого типа
+	// Инициализируем кольцевой FIFO-буфер
 	fifo_init (&__uart_tx_buf, UART_TX_BUF_SIZE);
 	
 	uart_clrscr ();
@@ -49,8 +54,6 @@ int uart_stdputc (char c, FILE *stream)
 			uart_stdputc ('\r', stream);
 		}
 	#endif
-	
-//	__uart_tx_byte (c);			// это передача с тупым ожиданием
 
 // Передача через буфер:
 	fifo_push (c, &__uart_tx_buf);	// пихаем в буфер
@@ -81,7 +84,6 @@ void uart_puts (char *str)
 
 void uart_clrscr (void)
 {
-//	printf (UART_ESC "[2J");
 	uart_puts (UART_ESC);
 	uart_puts ("[2J");
 	return;
@@ -89,7 +91,6 @@ void uart_clrscr (void)
 
 void uart_home (void)
 {
-//	printf (UART_ESC "[H");
 	uart_puts (UART_ESC);
 	uart_puts ("[H");
 	return;
@@ -103,7 +104,6 @@ inline void uart_goto_xy (int x, int y)
 
 void uart_reset_disp_attr (void)
 {
-//	printf (UART_ESC "[0m");
 	uart_puts (UART_ESC);
 	uart_puts ("[0m");
 	return;
@@ -120,48 +120,126 @@ inline void __uart_tx_routine (void)
 	// UDR готов, пишем в него из буфера:
 	UDR0 = fifo_pop (&__uart_tx_buf);
 	// Внимание! Нотация точечная, т.к. работаем с буфером напрямую, а не через указатель:
-	if (__uart_tx_buf.idxOut == __uart_tx_buf.idxIn)	// если на данный момент передать больше нечего,
-	{
+	if (__uart_tx_buf.idxOut == __uart_tx_buf.idxIn)
+	{	// если на данный момент передать больше нечего,
 		UCSR0B &= ~(1 << UDRIE0);	// отключаем данное прерывание
 	}
 }
 
-// void __uart_tx_byte (uint8_t data)
-// {	
-// // Тупая передача байта с ожиданием, не используем её
-// 	led_r_on ();
-// 	while(!(UCSR0A & (1 << UDRE0)))
-// 		;
-// 	led_r_off ();
-// 	UDR0 = data;
-// 	
-// 	return;
-// }
-
 inline void __uart_rx_byte (void)
 {	// Вызов по прерыванию
+	// Пока что примитивная система команд
 	uint8_t buff = UDR0;
+	
+	static uint8_t dbg = 0;
 	 
 	switch (buff)
 	{
-		case 'l':
+		case 'a':
 		{
-			led_g_switch ();
-			uart_set_disp_attr (F_GREEN);
-			printf ("[OK] LED \"G\" TOGGLED\n");
-			uart_reset_disp_attr ();
+			motors_arm ();
+			break;
+		}
+		case 'd':
+		{
+			motors_disarm ();
+			break;
+		}
+		case '0':
+		{
+//			motors_set_omega (0.0, 0.0);
+//			uart_puts ("[ OK ] 0.0; 0.0 SET\n");
+			mcontrol_set (0.0, 0.0);
+			uart_puts ("[ OK ] 0.0 m/s; 0.0 rad/s SET\n");
+			break;
+		}
+		case '1':
+		{
+// 			motors_set_omega (3.0, 3.0);
+// 			uart_puts ("[ OK ] 3.0; 3.0 SET\n");
+			mcontrol_set (0.1, 0.0);
+			uart_puts ("[ OK ] 0.1 m/s; 0.0 rad/s SET\n");
+			break;
+		}
+		case '2':
+		{
+// 			motors_set_omega (6.0, 6.0);
+// 			uart_puts ("[ OK ] 6.0; 6.0 SET\n");
+			mcontrol_set (0.2, 0.0);
+			uart_puts ("[ OK ] 0.2 m/s; 0.0 rad/s SET\n");
+			break;
+		}
+		case '3':
+		{
+// 			motors_set_omega (9.0, 9.0);
+// 			uart_puts ("[ OK ] 9.0; 9.0 SET\n");
+			mcontrol_set (0.3, 0.0);
+			uart_puts ("[ OK ] 0.3 m/s; 0.0 rad/s SET\n");
+			break;
+		}
+		case '4':
+		{
+// 			motors_set_omega (12.0, 12.0);
+// 			uart_puts ("[ OK ] 12.0; 12.0 SET\n");
+			mcontrol_set (0.4, 0.0);
+			uart_puts ("[ OK ] 0.4 m/s; 0.0 rad/s SET\n");
+			break;
+		}
+		case '5':
+		{
+// 			motors_set_omega (15.0, 15.0);
+// 			uart_puts ("[ OK ] 15.0; 15.0 SET\n");
+			mcontrol_set (0.5, 0.0);
+			uart_puts ("[ OK ] 0.5 m/s; 0.0 rad/s SET\n");
+			break;
+		}
+		case '6':
+		{
+// 			motors_set_omega (18.0, 18.0);
+// 			uart_puts ("[ OK ] 18.0; 18.0 SET\n");
+			mcontrol_set (0.6, 0.0);
+			uart_puts ("[ OK ] 0.6 m/s; 0.0 rad/s SET\n");
+			break;
+		}
+		case 'l':	// поворачиваем налево
+		{
+// 			motors_set_omega (3.0, 6.0);
+// 			uart_puts ("[ OK ] 3.0; 6.0 SET. Target OMEGA = 28 deg/s\n");
+			mcontrol_set (0.1, 0.5);
+			uart_puts ("[ OK ] 0.1 m/s; 0.5 rad/s SET\n");
+			break;
+		}
+		case 'r':	// поворачиваем направо
+		{
+// 			motors_set_omega (6.0, 3.0);
+// 			uart_puts ("[ OK ] 6.0; 3.0 SET. Target OMEGA = -28 deg/s\n");
+			mcontrol_set (0.1, -0.5);
+			uart_puts ("[ OK ] 0.1 m/s; -0.5 rad/s SET\n");
+			break;
+		}
+		case 'b':	// отладочная информация
+		{
+			if (!dbg)
+			{
+				dbg = 1;
+				uart_clrscr ();
+				uart_home ();
+				uart_puts ("~~~DEBUG MODE BEGIN~~~\n");
+				uart_puts("obj_L omega_L eps_L I_L u_L obj_R omega_R eps_R I_R u_R\nevery 0.1 s\n");
+				rtos_set_task (show_info_uart, 1000, 100);
+			}
+			else
+			{
+				dbg = 0;
+				uart_puts ("~~~DEBUG MODE END~~~\n");
+				rtos_delete_task (show_info_uart);
+			}
 			break;
 		}
 		default:
 		{
-			led_r_switch ();
-			
-// 			uart_set_disp_attr (F_RED);
-// 			printf ("[FAIL] UNKNOWN COMMAND\n");
-// 			uart_reset_disp_attr ();
-	
-			printf (ATTR "%d" ATTR_END "[FAIL]" ATTR_RST "UNKNOWN COMMAND\n", F_RED);
-			
+			uart_puts ("[ FAIL ] Unknown command. Performing DISARM\n");
+			motors_disarm ();
 			break;
 		}
 	} 

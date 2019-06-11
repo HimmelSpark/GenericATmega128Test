@@ -51,6 +51,7 @@ C_SRCS +=  \
 ../modules/md3.c \
 ../modules/motor.c \
 ../modules/mpu6050.c \
+../motion_control.c \
 ../rtos.c
 
 
@@ -72,6 +73,7 @@ modules/bmp180.o \
 modules/md3.o \
 modules/motor.o \
 modules/mpu6050.o \
+motion_control.o \
 rtos.o
 
 OBJS_AS_ARGS +=  \
@@ -86,6 +88,7 @@ modules/bmp180.o \
 modules/md3.o \
 modules/motor.o \
 modules/mpu6050.o \
+motion_control.o \
 rtos.o
 
 C_DEPS +=  \
@@ -100,6 +103,7 @@ modules/bmp180.d \
 modules/md3.d \
 modules/motor.d \
 modules/mpu6050.d \
+motion_control.d \
 rtos.d
 
 C_DEPS_AS_ARGS +=  \
@@ -114,6 +118,7 @@ modules/bmp180.d \
 modules/md3.d \
 modules/motor.d \
 modules/mpu6050.d \
+motion_control.d \
 rtos.d
 
 OUTPUT_FILE_PATH +=GenericATmega128test.elf
@@ -130,6 +135,8 @@ LINKER_SCRIPT_DEP+=
 
 
 # AVR32/GNU C Compiler
+
+
 
 
 

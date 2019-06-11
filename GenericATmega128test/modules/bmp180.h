@@ -78,8 +78,8 @@ void read_UP_exit (void);
 #define BMP180_MEASUREMENT_XLO	0xF8
 /*********************/
 
-#define BMP180_READ_STARTUP		1000	// ms
-#define BMP180_READ_PERIOD		100		// ms
+#define BMP180_STARTUP_DELAY		1000	// ms
+#define BMP180_READ_PERIOD			100		// ms
 // Для оценивателя:
 #define BMP180_ESTIM_CONST_Ki	1.0
 #define BMP180_ESTIM_CONST_dT	(BMP180_READ_PERIOD/1000.0)	// с

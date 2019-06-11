@@ -18,6 +18,7 @@
 #include "modules/bmp180.h"
 #include "modules/mpu6050.h"
 #include "modules/motor.h"
+#include "motion_control.h"
 #include "displays/_7seg_disp.h"
 #include "displays/lcd.h"
 /*******************/
@@ -32,8 +33,8 @@ void __top_priority (void);
 
 /* Устройства стандартного вывода */
 static FILE _7SEG_	= FDEV_SETUP_STREAM (_7seg_stdputc, NULL, _FDEV_SETUP_WRITE);
-static FILE _LCD_	= FDEV_SETUP_STREAM (lcd_stdputc, NULL, _FDEV_SETUP_WRITE);
 static FILE _UART_	= FDEV_SETUP_STREAM (uart_stdputc, NULL, _FDEV_SETUP_WRITE);
+static FILE _LCD_	= FDEV_SETUP_STREAM (lcd_stdputc, NULL, _FDEV_SETUP_WRITE);
 /**********************************/
 
 
@@ -45,6 +46,11 @@ ISR (TWI_vect)
 ISR (USART0_UDRE_vect)
 {
 	__uart_tx_routine ();
+}
+
+ISR (USART0_RX_vect)
+{
+	__uart_rx_byte ();
 }
 
 // ISR (TIMER0_COMP_vect)
@@ -95,25 +101,24 @@ int main (void)
 	rtos_init ();
 	
 	md3_init ();
-	
-	uart_init ();
-	i2c_init ();
-	lcd_init ();
+ 	uart_init ();
+ 	i2c_init ();
+ 	lcd_init ();
 	_7seg_init ();
 	motors_init ();
+	mcontrol_init ();
 	
 // Выбор стандартного вывода (необязательно здесь):
 //	stdout = &_7SEG_;
 // 	stdout = &_LCD_;
 // 	stdout = &_UART_;
-//	printf ("This is a STDOUT\ndev\n");
 	
-	rtos_set_task (show_info_7seg, 1000, 100);
-	rtos_set_task (show_info_uart, 1000, 200);
-	rtos_set_task (show_info_lcd, 1000, 100);
+	rtos_set_task (show_info_7seg, 1000, 200);
+ 	rtos_set_task (show_info_lcd, 1010, 100);
+// 	rtos_set_task (show_info_uart, 1050, 100);
 	
-	rtos_set_task (bmp180_init, 1, RTOS_RUN_ONCE);
-	rtos_set_task (mpu6050_init, 200, RTOS_RUN_ONCE);
+// 	rtos_set_task (bmp180_init, 1, RTOS_RUN_ONCE);
+ 	rtos_set_task (mpu6050_init, 1, RTOS_RUN_ONCE);
 	
 	sei ();
 
@@ -135,100 +140,130 @@ void __top_priority (void)
 
 void show_info_uart (void)
 {
-	static float time = 0.0;
+//	static float time = 0.0;
 	
 	stdout = &_UART_;
 	
-	uart_clrscr ();
-	uart_home ();
+// 	uart_clrscr ();
+// 	uart_home ();
 	
-	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
-	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
-
-	MOTOR_OMEGA_DATA	omega		= motors_get_omega (),
-						omega_obj	= motors_get_omega_obj ();
-						
-	MOTOR_POWER_DATA power = motors_get_power ();
+// 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
+// 	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
+// 
+ 	MOTOR_OMEGA_DATA	omega		= motors_get_omega (),
+ 						omega_obj	= motors_get_omega_obj ();
+// 						
+// 	MOTOR_POWER_DATA power = motors_get_power ();
+	
+	extern __debug_picontr_data picontr;
 	
 // В идеале надо вывести "фон" и обновлять только изменяющиеся значения
 
-	printf ("Elapsed Time		%.1f	[s]\n\n", time);
-	time += 0.2;
+// 	printf ("Elapsed Time		%.1f	[s]\n\n", time);
+// 	time += 0.2;
+// 
+// 	printf ("BMP180 TEMP:		%.1f	[deg. C]\n",  bmp180_get_T ());
+// 	printf ("BMP180 PRESSURE:	%.1f	[hPa]\n",  bmp180_get_P_hPa ());
+// 	printf ("BMP180 h:			%.1f	[m]\n", bmp180_get_h ());
+// 	printf ("BMP180 dh/dt:		%.1f	[m/s]\n\n", bmp180_get_dhdt ());
+// 	
+//  	printf ("MPU6050 TEMP:		%.1f	[deg. C]\n", mpu6050_get_T ());
+// 	printf ("MPU6050 ACCEL:		Wx=%.3f	Wy=%.3f	Wz=%.3f	[m/s^2]\n", \
+// 					mpu6050_accel.aX, mpu6050_accel.aY, mpu6050_accel.aZ);
+// 	printf ("MPU6050 GYRO:		OMx=%.3f	OMy=%.3f	OMz=%.3f	[deg./s]\n\n", \
+// 					mpu6050_gyro.gX, mpu6050_gyro.gY, mpu6050_gyro.gZ);
+// 
+// 	printf ("MOTOR_L:	TGT_SPEED = %4.1f	ACT_SPEED = %4.1f	[rad/s]\n",\
+// 					omega_obj.omegaL, omega.omegaL);
+// 	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
+// 					power.powL, (MOTORS_PWM_CONSTR_MAX/255.0)*100.0);
+// 	printf ("MOTOR_R:	TGT_SPEED = %4.1f	ACT_SPEED = %4.1f	[rad/s]\n",\
+// 					omega_obj.omegaR, omega.omegaR);
+// 	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
+// 					power.powR, (MOTORS_PWM_CONSTR_MAX/255.0)*100.0);
 
-	printf ("BMP180 TEMP:		%.1f	[deg. C]\n",  bmp180_get_T ());
-	printf ("BMP180 PRESSURE:	%.1f	[hPa]\n",  bmp180_get_P_hPa ());
-	printf ("BMP180 h:			%.1f	[m]\n", bmp180_get_h ());
-	printf ("BMP180 dh/dt:		%.1f	[m/s]\n\n", bmp180_get_dhdt ());
-	
- 	printf ("MPU6050 TEMP:		%.1f	[deg. C]\n", mpu6050_get_T ());
-	printf ("MPU6050 ACCEL:		Wx=%.3f	Wy=%.3f	Wz=%.3f	[m/s^2]\n", \
-					mpu6050_accel.aX, mpu6050_accel.aY, mpu6050_accel.aZ);
-	printf ("MPU6050 GYRO:		OMx=%.3f	OMy=%.3f	OMz=%.3f	[deg./s]\n\n", \
-					mpu6050_gyro.gX, mpu6050_gyro.gY, mpu6050_gyro.gZ);
-
-	printf ("MOTOR_L:	TGT_SPEED = %4.1f	ACT_SPEED = %4.1f	[rad/s]\n",\
-					omega_obj.omegaL, omega.omegaL);
-	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
-					power.powL, (MOTORS_PWM_CONSTR_MAX/255.0)*100.0);
-	printf ("MOTOR_R:	TGT_SPEED = %4.1f	ACT_SPEED = %4.1f	[rad/s]\n",\
-					omega_obj.omegaR, omega.omegaR);
-	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
-					power.powR, (MOTORS_PWM_CONSTR_MAX/255.0)*100.0);
+	printf ("%2d %2d %3d %4d %4d %2d %2d %3d %4d %4d\n", \
+	(int)omega_obj.omegaL, (int)omega.omegaL, (int)picontr.eps_L, (int)picontr.I_L, picontr.u_L, \
+	(int)omega_obj.omegaR, (int)omega.omegaR, (int)picontr.eps_R, (int)picontr.I_R, picontr.u_R);
 					
 	return;
 }
 
 void show_info_lcd (void)
 {
-	static float time = 0.0;
- 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
+//	static float time = -0.1;
+//	time += 0.1;
+
+// 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
+	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
+	MCONTROL_PARAMS motion = mcontrol_get_mparams ();
+//	extern __debug_picontr_data picontr;
 	
 	stdout = &_LCD_;
 	
-	printf ("Time %.1f [s]\naZ %.2f [m/s^2]\n", time, mpu6050_accel.aZ);
+	printf ("V:%.3f Om:%5.1f\ngZ %5.1f [deg/s]\n", \
+			motion.lin_vel, motion.ang_vel * 180.0 / 3.14, mpu6050_gyro.gZ);
+
+//	printf ("Time %.1f [s]\ngZ %5.1f [deg/s]\n", time, mpu6050_gyro.gZ);
+
 //	printf ("Time %.1f [s]\n\n", time);
-	time += 0.1;
+
+// 	printf ("L e%3d I%3d u%3d\nR e%3d I%3d u%3d\n", \
+// 			(int)picontr.eps_L, (int)picontr.I_L, picontr.u_L, \
+// 			(int)picontr.eps_R, (int)picontr.I_R, picontr.u_R);
+
 	
 	return;
 }
 
 void show_info_7seg (void)
 {
- 	MPU6050_ACCEL_DATA accel_data = mpu6050_get_accel ();
- 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
+// 	MPU6050_ACCEL_DATA accel_data = mpu6050_get_accel ();
+// 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
  	MOTOR_OMEGA_DATA omega = motors_get_omega ();
-// 	MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
+ 	MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
 // 	MOTOR_POWER_DATA power = motors_get_power ();
+
+	uint16_t pot_val = md3_get_pot ();
 	
 	stdout = &_7SEG_;
 
-
 	switch ((~BUTTON_PIN) & BUTTON_MSK)	// смотрим на "кнопочную" часть порта
 	{
+		case ((1 << BUT1) | (1 << BUT0)):	// нажата кнопка + провод на PB0
+		{
+			bmp180_set_P0 (bmp180_get_P_hPa () * 100);
+			break;
+		}
 		case 0:	// ничего не подключено
 		{
+			/*printf ("%4.1f\n", gyro_data.gX);*/
 			/*printf ("a%3d\n", adc_val >> 2);*/
-			printf ("%4.1f\n", omega.omegaL);
-			/*printf ("%4.1f\n", bmp180_get_dhdt ());*/
+			printf ("%2d:%2d\n", (int)omega_obj.omegaL, (int)omega_obj.omegaR);
+			/*printf ("%.1f\n", bmp180_get_P_mmHg ());*/
 			break;
 		}
 		case (1 << BUT0):
 		{
+			/*printf ("%4.1f\n", bmp180_get_h ());*/
+			/*printf ("%4.1f\n", gyro_data.gY);*/
+			/*printf ("a%3.1f\n", adc_val / 100.0);*/
 			/*printf ("t%3.1f\n", bmp180_get_T());*/
 			/*printf ("a%3d\n", adc_val >> 2);*/
-			printf ("%4.1f\n", omega.omegaR);
-			/*printf ("%4.1f\n", bmp180_get_h ());*/
+			/*printf ("r%4.1f\n", omega.omegaR);*/
 			break;
 		}
-		case (1 << BUT2):	// не ошибка, BUT1 пока не используется
+		case (1 << BUT2):
 		{
+			printf ("%d\n", pot_val);
+			/*printf ("%4.1f\n", gyro_data.gZ);*/
 			/*printf ("%4.1f\n", power.powL);*/
-			printf ("%.1f\n", bmp180_get_P_mmHg ());
+			/*printf ("%4.1f\n", bmp180_get_dhdt ());*/
 			break;
 		}
 		case (1 << BUT3):
 		{
-			printf ("%4.1f\n", gyro_data.gZ);
+			/*printf ("%4.1f\n", gyro_data.gZ);*/
 			/*printf ("%4.1f\n", accel_data.aZ);*/
 			break;
 		}

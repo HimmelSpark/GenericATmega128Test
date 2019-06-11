@@ -24,5 +24,7 @@ modules\motor.c
 
 modules\mpu6050.c
 
+motion_control.c
+
 rtos.c
 

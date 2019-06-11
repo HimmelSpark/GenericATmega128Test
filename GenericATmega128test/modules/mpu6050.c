@@ -75,7 +75,7 @@ void mpu6050_init_set (void)
 
 void init_set_exit (void)
 {
-	rtos_set_task (mpu6050_poweron, MPU6050_STARTUP_TIME, RTOS_RUN_ONCE);
+	rtos_set_task (mpu6050_poweron, MPU6050_STARTUP_DELAY, RTOS_RUN_ONCE);
 	return;
 }
 
@@ -93,9 +93,9 @@ void mpu6050_poweron (void)
 
 void poweron_exit (void)
 {
-	rtos_set_task (mpu6050_read, MPU6050_READ_STARTUP_TIME, MPU6050_READ_PERIOD);	// теперь готовы читать данные
+	rtos_set_task (mpu6050_read, MPU6050_READ_STARTUP_DELAY, MPU6050_READ_PERIOD);	// теперь готовы читать данные
 	rtos_set_task (mpu6050_gyro_filter, \
-					MPU6050_READ_STARTUP_TIME + MPU6050_READ_PERIOD, \
+					MPU6050_READ_STARTUP_DELAY + MPU6050_READ_PERIOD, \
 					MPU6050_READ_PERIOD);	// запускаем фильтр
 	
 	return;

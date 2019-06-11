@@ -7,7 +7,6 @@
 
 #include "../general.h"
 #include "lcd.h"
-#include "../modules/md3.h"
 #include "../fifo.h"
 #include "../rtos.h"
 
@@ -107,53 +106,6 @@ void __lcd_tx_routine (void)
 	return;
 }
 
-// void __lcd_write_byte (uint8_t mode, uint8_t data)
-// {
-// 	uint8_t data_l, data_h;
-// 
-// 	// если можно прочитать флаг занятости, ждём
-// 	if (__lcd_bf_readable)
-// 	{
-// 		__lcd_busy_wait ();
-// 	}
-// 	// в противном случае полагаем, что необходимые интервалы времени выдержаны
-// 	
-// 	data_l = data & 0x0F;	// младшие 4 бита
-// 	data_h = data >> 4;		// старшие 4 бита
-// 
-// 	__LCD_RW_LO;	// запись
-// 	
-// 	switch (mode)
-// 	{
-// 		case LCD_MODE_WR_CMD:
-// 		{
-// 			__LCD_RS_LO;
-// 			break;
-// 		}
-// 		case LCD_MODE_WR_DATA:
-// 		{
-// 			__LCD_RS_HI;
-// 			break;
-// 		}
-// 	}
-// 	
-// 	__LCD_DB_OUT;
-// 	LCD_DB_PORT |= data_h;
-// 	__lcd_strobe ();
-// 	
-// 	// если перешли в 4-битный режим, передаём младшую тетраду
-// 	if (__lcd_4bit_enabled)
-// 	{
-// 		__LCD_DB_PORT_LO;
-// 		LCD_DB_PORT |= data_l;
-// 		__lcd_strobe ();
-// 	}
-// 	
-// 	__LCD_DB_HiZ;
-// 	
-// 	return;
-// }
-
 uint8_t __lcd_read_bf (void)
 {
 	uint8_t bf = 0;
@@ -232,20 +184,6 @@ void __lcd_set_ddram (uint8_t ad)
 	__lcd_write_byte (LCD_MODE_WR_CMD, (1 << LCD_DDRAM_SET) | ad);
 	
 	return;
-}
-
-void __lcd_busy_wait (void)
-{
-	register uint8_t bf = __lcd_read_bf ();
-	
-	led_r_on ();
-	while (bf)	// это тупое ожидание, но очень быстрое. Скорее всего, так и оставить.
-	{
-		bf = __lcd_read_bf ();
-	}
-	led_r_off ();
-
- 	return;
 }
 
 inline void __lcd_strobe (void)
@@ -360,6 +298,7 @@ int lcd_stdputc (char c, FILE *stream)
 inline void lcd_putc (char c)
 {
 	lcd_stdputc (c, NULL);
+	
 	return;
 }
 
@@ -393,14 +332,14 @@ LCD_POS lcd_getpos (void)
 	return pos;
 }
 
-void lcd_clr (void)
+inline void lcd_clr (void)
 {
 	__lcd_write_byte (LCD_MODE_WR_CMD, 1 << LCD_CLR);
 	
 	return;
 }
 
-void lcd_home (void)
+inline void lcd_home (void)
 {
 	__lcd_write_byte (LCD_MODE_WR_CMD, 1 << LCD_HOME);
 	

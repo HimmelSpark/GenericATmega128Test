@@ -29,7 +29,6 @@ void __lcd_tx_routine (void);		// непосредственная запись 
 uint8_t __lcd_read_bf (void);		// возвращает  флаг занятости
 uint8_t __lcd_read_ac (void);		// возвращает adress counter
 void __lcd_set_ddram (uint8_t ad);	// прыг
-void __lcd_busy_wait (void);		// тупое ожидание, но вроде быстрое; скорее всего, так и оставить
 void __lcd_strobe (void);			// строб E 
 /*************************/
 

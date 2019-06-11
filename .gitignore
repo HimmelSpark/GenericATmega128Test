@@ -1,2 +1,11 @@
 
 GenericATmega128test/Debug/Размеры.txt
+.vs/GenericATmega128test/v14/.atsuo
+*.d
+*.o
+*.eep
+*.elf
+*.hex
+*.lss
+*.map
+*.srec

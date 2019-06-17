@@ -15,30 +15,25 @@
 #include "displays/lcd.h"
 #include "interfaces/uart.h"
 
-MCONTROL_PARAMS __mcontrol_params;
+MOTION_PARAMS __motion_params;
 
-uint8_t __mcontroller_active = 0;
+uint8_t __mcontroller_reset = 1;
 
 void mcontrol_init (void)
 {
-	__mcontrol_params.lin_vel = 0.0;
-	__mcontrol_params.ang_vel = 0.0;
-	
-//	rtos_set_task (__motion_controller, MCONTROL_STARTUP_DELAY, MCONTROL_PERIOD);
-//	rtos_set_task (__mcontrol_obj_poll, MCONTROL_STARTUP_DELAY - 1, MCONTROL_PERIOD);
+	__motion_params.lin_vel = 0.0;
+	__motion_params.ang_vel = 0.0;
 	
 	return;
 }
 
 void mcontrol_set (float lin_vel, float ang_vel)
 {
-	if (!__mcontroller_active)
+	if (__mcontroller_reset)
 	{	// __motion_controller пока не активен
 		if (lin_vel > 0.0)
 		{	// "Будим" его, если заданная скорость отлична от нуля
 			rtos_set_task (__motion_controller, RTOS_RUN_ASAP, MCONTROL_PERIOD);
-			__mcontroller_active = 1;
-			uart_puts ("[ OK ] Motion controller active\n");
 		}
 		else
 		{	// В противном случае уходим отсюда
@@ -50,35 +45,35 @@ void mcontrol_set (float lin_vel, float ang_vel)
 	// Установка линейной скорости:
 	if (lin_vel > MCONTROL_LIN_VEL_CONSTR_MAX)
 	{
-		__mcontrol_params.lin_vel = MCONTROL_LIN_VEL_CONSTR_MAX;
+		__motion_params.lin_vel = MCONTROL_LIN_VEL_CONSTR_MAX;
 	}
 	else if (lin_vel < 0)
 	{
-		__mcontrol_params.lin_vel = 0.0;
+		__motion_params.lin_vel = 0.0;
 	}
 	else
 	{
-		__mcontrol_params.lin_vel = lin_vel;
+		__motion_params.lin_vel = lin_vel;
 	}
 	
 	// Установка угловой скорости (поворота)
 	if (fabs(ang_vel) > MCONTROL_ANG_VEL_CONSTR_MAX)
 	{	//									Знак			*		ограничение
-		__mcontrol_params.ang_vel = (ang_vel/fabs(ang_vel)) * MCONTROL_ANG_VEL_CONSTR_MAX;
+		__motion_params.ang_vel = (ang_vel/fabs(ang_vel)) * MCONTROL_ANG_VEL_CONSTR_MAX;
 	}
 	else
 	{
-		__mcontrol_params.ang_vel = ang_vel;
+		__motion_params.ang_vel = ang_vel;
 	}
 	
 	return;
 }
 
-MCONTROL_PARAMS mcontrol_get_mparams (void)
+MOTION_PARAMS mcontrol_get_mparams (void)
 {	// Расчётные скорости (на основе скоростей вращения двигателей)
 	
 	MOTOR_OMEGA_DATA omega = motors_get_omega ();
-	MCONTROL_PARAMS motion;
+	MOTION_PARAMS motion;
 	
 	motion.lin_vel = (MCONTROL_R/2.0) * (omega.omegaL + omega.omegaR);
 	motion.ang_vel = (MCONTROL_R/MCONTROL_B) * (omega.omegaR - omega.omegaL);
@@ -93,26 +88,38 @@ void __motion_controller (void)
 	MPU6050_GYRO_DATA gyro;
 	double omega1_obj, omega2_obj;
 	
-	if (__mcontrol_params.lin_vel > 0.0)
+	static double I = 0.0, domega = 0.0;
+	double eps = 0.0;
+	
+	if (__mcontroller_reset)
+	{
+		I = 0.0;
+		
+		__mcontroller_reset = 0;
+		uart_puts ("[ OK ] Motion controller engaged\n");
+	}
+	
+	if (__motion_params.lin_vel > 0.0)
 	{	// Движение вперёд
 		
 		gyro = mpu6050_get_gyro ();
 		gyro.gZ *= 3.14/180.0;	// перевод из град/с в рад/с
-
-//		gyro.gZ = __mcontrol_params.ang_vel; // отладка; не учитываем показания ДУС
 		
-		omega1_obj = (2*__mcontrol_params.lin_vel - MCONTROL_B*__mcontrol_params.ang_vel) / (2*MCONTROL_R);
-		omega2_obj = (2*__mcontrol_params.lin_vel + MCONTROL_B*__mcontrol_params.ang_vel) / (2*MCONTROL_R);
+		// Задаём движение с заданной линейной скоростью:
+		omega1_obj = omega2_obj = __motion_params.lin_vel / MCONTROL_R;
 		
-		// Поскольку ПИ-регулятор двигателей из motor.c на вход получает уставки по скоростям
-		// вращения колёс, а мы хотим здесь учесть ещё и показания ДУС по оси Z, то проведём
-		// коррекцию уставок с тем, чтобы в них уже была учтена ошибка по угловой скорости платформы,
-		// и уже скорректированные уставки передадим в set_omega
-		// (можно было бы весь регулятор засунуть в motor.c, однако по идее он должен заниматься
-		// регулированием только скорости двигателей)
+		// Коррекция скоростей с учётом заданной угловой скорости вращения платформы
+		// (ПИ-регулятор)
+		eps = __motion_params.ang_vel - gyro.gZ;	// ошибка по угловой скрости
+		I += eps * MCONTROL_PI_Ki * MCONTROL_PI_dT;
+		domega = eps * MCONTROL_PI_Kp + I;			// управляющее воздействие как поправка к скорости
+													// вращения двигателей
 		
-		omega1_obj = omega1_obj - MCONTROL_K*(__mcontrol_params.ang_vel - gyro.gZ);
-		omega2_obj = omega2_obj + MCONTROL_K*(__mcontrol_params.ang_vel - gyro.gZ);
+		// ToDo: насыщение
+		
+		omega1_obj += (-domega);		// поправка для левого двигателя
+		omega2_obj += domega;	// поправка для правого двигателя
+		
 	}
 	else
 	{	// Остановка
@@ -120,8 +127,8 @@ void __motion_controller (void)
 		omega1_obj = omega2_obj = 0.0;	// в случае нулевых уставок платформа гарантированно
 										// остановится (это обеспечивается ПИ-регулятором)
 		rtos_delete_task (__motion_controller);
-		__mcontroller_active = 0;
-		uart_puts ("[ OK ] Motion controller inactive\n");
+		__mcontroller_reset = 1;
+		uart_puts ("[ OK ] Motion controller disengaged\n");
 	}
 	
 	motors_set_omega (omega1_obj, omega2_obj);
@@ -131,7 +138,7 @@ void __motion_controller (void)
 
 void __mcontrol_obj_poll (void)
 {
-	__mcontrol_params.lin_vel = (MCONTROL_LIN_VEL_CONSTR_MAX * md3_get_pot ())  / MD3_POT_MAX;
+	__motion_params.lin_vel = (MCONTROL_LIN_VEL_CONSTR_MAX * md3_get_pot ())  / MD3_POT_MAX;
 	
 	return;
 }

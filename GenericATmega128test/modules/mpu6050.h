@@ -30,8 +30,6 @@ MPU6050_ACCEL_DATA mpu6050_get_accel (void);// возвращает структ
 MPU6050_GYRO_DATA mpu6050_get_gyro (void);	// возвращает структуру из 3-х компонент угловой скорости, °/с
 float mpu6050_get_T (void);
 
-void mpu6050_gyro_filter (void);	// апериодический фильтр угловой скорости
-
 /* exit-функции I2C */
 void init_set_exit (void);
 void read_exit (void);
@@ -133,13 +131,6 @@ void poweron_exit (void);
 	#endif
 #endif
 /**************************************************************************/
-
-
-/* Для алгоритма фильтра */
-
-#define FILT_CONST_Ki	5.0
-#define FILT_CONST_dT	(MPU6050_READ_PERIOD/1000.0)	// с
-#define FILT_PERIOD		MPU6050_READ_PERIOD				// мс, для RTOS
 
 
 #endif /* MPU6050_H_ */

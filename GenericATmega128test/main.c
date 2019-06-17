@@ -196,7 +196,7 @@ void show_info_lcd (void)
 
 // 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
 	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
-	MCONTROL_PARAMS motion = mcontrol_get_mparams ();
+	MOTION_PARAMS motion = mcontrol_get_mparams ();
 //	extern __debug_picontr_data picontr;
 	
 	stdout = &_LCD_;
@@ -255,7 +255,7 @@ void show_info_7seg (void)
 		}
 		case (1 << BUT2):
 		{
-			printf ("%d\n", pot_val);
+			/*printf ("%d\n", pot_val);*/
 			/*printf ("%4.1f\n", gyro_data.gZ);*/
 			/*printf ("%4.1f\n", power.powL);*/
 			/*printf ("%4.1f\n", bmp180_get_dhdt ());*/

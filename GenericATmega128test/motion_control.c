@@ -14,6 +14,7 @@
 #include "modules/mpu6050.h"
 #include "displays/lcd.h"
 #include "interfaces/uart.h"
+#include "modules/md3.h"
 
 MOTION_PARAMS __motion_params;
 
@@ -31,7 +32,7 @@ void mcontrol_set (float lin_vel, float ang_vel)
 {
 	if (__mcontroller_reset)
 	{	// __motion_controller пока не активен
-		if (lin_vel > 0.0)
+		if (lin_vel != 0.0)
 		{	// "Будим" его, если заданная скорость отлична от нуля
 			rtos_set_task (__motion_controller, RTOS_RUN_ASAP, MCONTROL_PERIOD);
 		}
@@ -43,13 +44,9 @@ void mcontrol_set (float lin_vel, float ang_vel)
 	}
 	
 	// Установка линейной скорости:
-	if (lin_vel > MCONTROL_LIN_VEL_CONSTR_MAX)
+	if (fabs(lin_vel) > MCONTROL_LIN_VEL_CONSTR_MAX)
 	{
 		__motion_params.lin_vel = MCONTROL_LIN_VEL_CONSTR_MAX;
-	}
-	else if (lin_vel < 0)
-	{
-		__motion_params.lin_vel = 0.0;
 	}
 	else
 	{
@@ -57,9 +54,11 @@ void mcontrol_set (float lin_vel, float ang_vel)
 	}
 	
 	// Установка угловой скорости (поворота)
+	int8_t sgn = (ang_vel >= 0) ? 1 : (-1);
+	
 	if (fabs(ang_vel) > MCONTROL_ANG_VEL_CONSTR_MAX)
-	{	//									Знак			*		ограничение
-		__motion_params.ang_vel = (ang_vel/fabs(ang_vel)) * MCONTROL_ANG_VEL_CONSTR_MAX;
+	{
+		__motion_params.ang_vel = sgn * MCONTROL_ANG_VEL_CONSTR_MAX;
 	}
 	else
 	{
@@ -99,11 +98,9 @@ void __motion_controller (void)
 		uart_puts ("[ OK ] Motion controller engaged\n");
 	}
 	
-	if (__motion_params.lin_vel > 0.0)
-	{	// Движение вперёд
-		
+	if (__motion_params.lin_vel != 0.0)
+	{
 		gyro = mpu6050_get_gyro ();
-		gyro.gZ *= 3.14/180.0;	// перевод из град/с в рад/с
 		
 		// Задаём движение с заданной линейной скоростью:
 		omega1_obj = omega2_obj = __motion_params.lin_vel / MCONTROL_R;
@@ -117,8 +114,8 @@ void __motion_controller (void)
 		
 		// ToDo: насыщение
 		
-		omega1_obj += (-domega);		// поправка для левого двигателя
-		omega2_obj += domega;	// поправка для правого двигателя
+		omega1_obj += (-domega);	// поправка для левого двигателя
+		omega2_obj += domega;		// поправка для правого двигателя
 		
 	}
 	else

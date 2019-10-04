@@ -86,4 +86,6 @@ uint16_t md3_get_pot (void)
 	retval = (retval > MD3_POT_TRS) ? (retval - MD3_POT_TRS) : 0;	// мёртвая зона потенциометра
 	
 	return retval;
+
+//	return 0;
 }

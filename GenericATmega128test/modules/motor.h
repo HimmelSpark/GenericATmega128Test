@@ -41,8 +41,8 @@ typedef struct {
 	
 
 /* Служебные функции */
-void __enc_L (void);			// событие энкодера L (фаза 1)	ToDo: фаза 2
-void __enc_R (void);			// событие энкодера R (фаза 1)	ToDo: фаза 2
+void __enc_L (void);			// событие энкодера L (фаза 1/Y)
+void __enc_R (void);			// событие энкодера R (фаза 1/Y)
 void __enc_L_enable (void);		// разрешить чтение с энкодера L
 void __enc_R_enable (void);		// разрешить чтение с энкодера R
 void __motors_set_thrust (int16_t thrust_L, int16_t thrust_R);	// "тяга"; с учётом знака (на будущее)
@@ -71,33 +71,80 @@ void motors_set_omega (double omega_L, double omega_R); // Задать уста
 #define MOTOR_L 0
 #define MOTOR_R	1
 
-#define MOTORS_DDR			DDRB
-#define MOTORS_PORT			PORTB
+// Пины ШИМ - связаны с EN_A и EN_B силовой платы
+#define MOTORS_PWM_DDR		DDRB
+#define MOTORS_PWM_PORT		PORTB	
 
 #define MOTOR_L_PWM_PIN		PB6
 #define MOTOR_R_PWM_PIN		PB7
 
 #define MOTOR_L_OCR			OCR1B
 #define MOTOR_R_OCR			OCR1C
+//
 
-#define ENCODERS_PORT		PORTD
-#define ENCODERS_DDR		DDRD
-#define ENCODERS_PIN		PIND
-#define ENC_L_PIN			PIND2
-#define ENC_R_PIN			PIND3
+// Пины управления направлением/торможением двигателей - связаны с IN1,2,3,4 силовой платы
+#define MOTORS_CTRL_PORT	PORTF
+#define MOTORS_CTRL_DDR		DDRF
+
+#define MOTORS_CTRL_IN1		PF4
+#define MOTORS_CTRL_IN2		PF5
+#define MOTORS_CTRL_IN3		PF6
+#define MOTORS_CTRL_IN4		PF7
+//
+
+// Энкодеры
+#define ENCODERS_PORT		PORTE
+#define ENCODERS_DDR		DDRE
+#define ENCODERS_PIN		PINE
+
+#define ENC_L_A_PIN			PINE4	// Y
+#define ENC_R_A_PIN			PINE5	// G
+#define ENC_L_B_PIN			PINE6	// Y
+#define ENC_R_B_PIN			PINE7	// G
+
 
 
 /* Программные определения */
 
+// Биты состояния
+// Регистр LO
+// #define MOTORS_DISARMED				0
+// #define MOTORS_DISARM_ARMED			1
+// #define MOTORS_ESTIM_RESET			2
+// #define MOTORS_ESTIM_DISENG_ARMED	3
+// #define MOTORS_PICONTR_RESET		4
+// #define MOTORS_L_REACHED_CSTR		5
+// #define MOTORS_R_REACHED_CSTR		6
+// #define MOTORS_____RESERVED			7
+// Регистр HI
+// #define MOTORS_ENC_L_ENABLE			0
+// #define MOTORS_ENC_R_ENABLE			1
+
+
+#define MOTORS_STARTUP_TIME			1000	// ms
+
 #define ENC_FILTER_TIME				500		// us; для фильтра ложных прерываний
 
-#define MOTORS_PWM_TRS				10		// экспериментально установленный порог страгивания
+//#define MOTORS_PWM_TRS				40		// экспериментально установленный порог страгивания
 #define MOTORS_PWM_CONSTR_MAX		200		// ограничение сверху
 
 #define MOTORS_THRUST_POS			1
 #define MOTORS_THRUST_NEG			(-1)
 
-#define MOTORS_STARTUP_TIME			1000	// ms
+// Макросы переключения направления двигателей:
+#define __MOTORS_CTRL_L_STOP	MOTORS_CTRL_PORT &= ~((1 << MOTORS_CTRL_IN1) | (1 << MOTORS_CTRL_IN2))
+#define __MOTORS_CTRL_L_FWD		MOTORS_CTRL_PORT |= (1 << MOTORS_CTRL_IN1);\
+									MOTORS_CTRL_PORT &= ~(1 << MOTORS_CTRL_IN2)
+#define __MOTORS_CTRL_L_REV		MOTORS_CTRL_PORT &= ~(1 << MOTORS_CTRL_IN1);\
+									MOTORS_CTRL_PORT |= (1 << MOTORS_CTRL_IN2)
+
+#define __MOTORS_CTRL_R_STOP	MOTORS_CTRL_PORT &= ~((1 << MOTORS_CTRL_IN3) | (1 << MOTORS_CTRL_IN4))
+#define __MOTORS_CTRL_R_FWD		MOTORS_CTRL_PORT |= (1 << MOTORS_CTRL_IN3);\
+									MOTORS_CTRL_PORT &= ~(1 << MOTORS_CTRL_IN4)
+#define __MOTORS_CTRL_R_REV		MOTORS_CTRL_PORT &= ~(1 << MOTORS_CTRL_IN3);\
+									MOTORS_CTRL_PORT |= (1 << MOTORS_CTRL_IN4)
+//
+
 
 /* Определения алгоритмов оценки/управления */
 

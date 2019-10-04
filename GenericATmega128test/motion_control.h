@@ -40,7 +40,7 @@ void __mcontrol_obj_poll (void);	// опрос задатчика линейной скорости (отладка)
 #define MCONTROL_R			0.0325	// м; радиус ведущих колёс
 #define MCONTROL_B			0.2100	// м; расстояние между ведущими колёсами
 
-#define MCONTROL_PI_Kp		1.0							// параметры
+#define MCONTROL_PI_Kp		2.0							// параметры
 #define MCONTROL_PI_Ki		1.0							// ПИ-
 #define MCONTROL_PI_dT		(MCONTROL_PERIOD/1000.0)	// регулятора
 

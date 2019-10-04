@@ -26,8 +26,8 @@ void mpu6050_init_set (void);
 void mpu6050_poweron (void);
 void mpu6050_read (void);
 
-MPU6050_ACCEL_DATA mpu6050_get_accel (void);// возвращает структуру из 3-х компонент ускорения, g
-MPU6050_GYRO_DATA mpu6050_get_gyro (void);	// возвращает структуру из 3-х компонент угловой скорости, °/с
+MPU6050_ACCEL_DATA mpu6050_get_accel (void);// возвращает структуру из 3-х компонент ускорения
+MPU6050_GYRO_DATA mpu6050_get_gyro (void);	// возвращает структуру из 3-х компонент угловой скорости
 float mpu6050_get_T (void);
 
 /* exit-функции I2C */
@@ -87,7 +87,7 @@ void poweron_exit (void);
 /********************/
 
 #define MPU6050_STARTUP_DELAY		300		// ms; от init до poweron
-#define MPU6050_READ_STARTUP_DELAY	60		// ms; от poweron до первого read
+#define MPU6050_READ_STARTUP_DELAY	100		// ms; от poweron до первого read
 #define MPU6050_READ_PERIOD			100		// ms
 
 #define MPU6050_WORD_SIZE		2	// байта на слово (для всех измерений)
@@ -97,19 +97,33 @@ void poweron_exit (void);
 // Необходимо делить показания GYRO на MPU6050_GYRO_SCALE,
 // accel - на MPU6050_ACCEL_SCALE
 
-#if MPU6050_FS_SEL_VAL == 0
-	#define MPU6050_GYRO_SCALE	131.0	// double
-#elif MPU6050_FS_SEL_VAL == 1
-	#define MPU6050_GYRO_SCALE	65.5	// double
-#elif MPU6050_FS_SEL_VAL == 2
-	#define MPU6050_GYRO_SCALE	32.8	// double
-#elif MPU6050_FS_SEL_VAL == 3
-	#define MPU6050_GYRO_SCALE	16.4	// double
+#define MPU6050_GYRO_AS_RAD_S	1		// 1 - угловые скорости в рад/с, 0 - в °/с
+
+#if MPU6050_GYRO_AS_RAD_S == 1
+	#if MPU6050_FS_SEL_VAL == 0
+		#define MPU6050_GYRO_SCALE	7509.6	// double
+	#elif MPU6050_FS_SEL_VAL == 1
+		#define MPU6050_GYRO_SCALE	3754.8	// double
+	#elif MPU6050_FS_SEL_VAL == 2
+		#define MPU6050_GYRO_SCALE	1880.3	// double
+	#elif MPU6050_FS_SEL_VAL == 3
+		#define MPU6050_GYRO_SCALE	940.1	// double
+	#endif
+#else
+	#if MPU6050_FS_SEL_VAL == 0
+		#define MPU6050_GYRO_SCALE	131.0	// double
+	#elif MPU6050_FS_SEL_VAL == 1
+		#define MPU6050_GYRO_SCALE	65.5	// double
+	#elif MPU6050_FS_SEL_VAL == 2
+		#define MPU6050_GYRO_SCALE	32.8	// double
+	#elif MPU6050_FS_SEL_VAL == 3
+		#define MPU6050_GYRO_SCALE	16.4	// double
+	#endif
 #endif
 																						 
-#define MPU6050_DISP_ACCEL_AS_G	0		// отображать ускорение в единицах g (иначе в м/с^2)
+#define MPU6050_ACCEL_AS_G	0			// 1 - ускорение в единицах g, 0 - в м/с^2
 
- #if MPU6050_DISP_ACCEL_AS_G == 1
+#if MPU6050_ACCEL_AS_G == 1
 	#if MPU6050_AFS_SEL_VAL == 0
 		#define MPU6050_ACCEL_SCALE	16384.0	// double
 	#elif MPU6050_AFS_SEL_VAL == 1

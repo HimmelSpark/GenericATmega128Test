@@ -85,12 +85,12 @@ ISR (TIMER3_COMPC_vect) // разрешаем прерывания энкоде�
 	__enc_R_enable ();
 }
 
-ISR (INT2_vect)			// прерывание энкодера L
+ISR (INT4_vect)			// прерывание энкодера L
 {
 	__enc_L ();
 }
 
-ISR (INT3_vect)			// прерывание энкодера R
+ISR (INT5_vect)			// прерывание энкодера R
 {
 	__enc_R ();
 }
@@ -101,9 +101,9 @@ int main (void)
 	rtos_init ();
 	
 	md3_init ();
- 	uart_init ();
- 	i2c_init ();
- 	lcd_init ();
+	uart_init ();
+	i2c_init ();
+//	lcd_init ();
 	_7seg_init ();
 	motors_init ();
 	mcontrol_init ();
@@ -113,8 +113,8 @@ int main (void)
 // 	stdout = &_LCD_;
 // 	stdout = &_UART_;
 	
-	rtos_set_task (show_info_7seg, 1000, 200);
- 	rtos_set_task (show_info_lcd, 1010, 100);
+//	rtos_set_task (show_info_7seg, 1000, 100);
+// 	rtos_set_task (show_info_lcd, 1010, 100);
 // 	rtos_set_task (show_info_uart, 1050, 100);
 	
 // 	rtos_set_task (bmp180_init, 1, RTOS_RUN_ONCE);
@@ -148,14 +148,15 @@ void show_info_uart (void)
 // 	uart_home ();
 	
 // 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
-// 	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
-// 
+ 	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
+	MOTION_PARAMS motion = mcontrol_get_mparams ();
+
  	MOTOR_OMEGA_DATA	omega		= motors_get_omega (),
  						omega_obj	= motors_get_omega_obj ();
 // 						
 // 	MOTOR_POWER_DATA power = motors_get_power ();
 	
-	extern __debug_picontr_data picontr;
+//	extern __debug_picontr_data picontr;
 	
 // В идеале надо вывести "фон" и обновлять только изменяющиеся значения
 
@@ -182,9 +183,12 @@ void show_info_uart (void)
 // 	printf ("		USED_POWER = %4.1f	POWER_LIM = %4.1f	[%%]\n",\
 // 					power.powR, (MOTORS_PWM_CONSTR_MAX/255.0)*100.0);
 
-	printf ("%2d %2d %3d %4d %4d %2d %2d %3d %4d %4d\n", \
-	(int)omega_obj.omegaL, (int)omega.omegaL, (int)picontr.eps_L, (int)picontr.I_L, picontr.u_L, \
-	(int)omega_obj.omegaR, (int)omega.omegaR, (int)picontr.eps_R, (int)picontr.I_R, picontr.u_R);
+// 	printf ("%2d %2d %3d %4d %4d %2d %2d %3d %4d %4d\n", \
+// 	(int)omega_obj.omegaL, (int)omega.omegaL, (int)picontr.eps_L, (int)picontr.I_L, picontr.u_L, \
+// 	(int)omega_obj.omegaR, (int)omega.omegaR, (int)picontr.eps_R, (int)picontr.I_R, picontr.u_R);
+
+	printf ("%4.1f  |  %4.1f      |     %6.1f      |     %6.3f\n", \
+				omega_obj.omegaL, omega_obj.omegaR, mpu6050_gyro.gZ, motion.lin_vel);
 					
 	return;
 }
@@ -195,14 +199,18 @@ void show_info_lcd (void)
 //	time += 0.1;
 
 // 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
-	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
-	MCONTROL_PARAMS motion = mcontrol_get_mparams ();
+//	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro ();
+//	MOTION_PARAMS motion = mcontrol_get_mparams ();
 //	extern __debug_picontr_data picontr;
-	
+
+	MOTOR_OMEGA_DATA omega = motors_get_omega();
+		
 	stdout = &_LCD_;
 	
-	printf ("V:%.3f Om:%5.1f\ngZ %5.1f [deg/s]\n", \
-			motion.lin_vel, motion.ang_vel * 180.0 / 3.14, mpu6050_gyro.gZ);
+	printf("L: %.1f\nR: %.1f\n", omega.omegaL, omega.omegaR);
+	
+// 	printf ("V:%.3f Om:%5.1f\ngZ %5.1f [deg/s]\n", \
+// 			motion.lin_vel, motion.ang_vel * 180.0 / 3.14, mpu6050_gyro.gZ);
 
 //	printf ("Time %.1f [s]\ngZ %5.1f [deg/s]\n", time, mpu6050_gyro.gZ);
 
@@ -219,52 +227,79 @@ void show_info_lcd (void)
 void show_info_7seg (void)
 {
 // 	MPU6050_ACCEL_DATA accel_data = mpu6050_get_accel ();
-// 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
- 	MOTOR_OMEGA_DATA omega = motors_get_omega ();
- 	MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
+ 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
+  MOTOR_OMEGA_DATA omega = motors_get_omega ();
+//  MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
 // 	MOTOR_POWER_DATA power = motors_get_power ();
 
 	uint16_t pot_val = md3_get_pot ();
+	
+	double setval = ((double)pot_val/(double)MD3_POT_MAX) * 0.5;
 	
 	stdout = &_7SEG_;
 
 	switch ((~BUTTON_PIN) & BUTTON_MSK)	// смотрим на "кнопочную" часть порта
 	{
-		case ((1 << BUT1) | (1 << BUT0)):	// нажата кнопка + провод на PB0
-		{
-			bmp180_set_P0 (bmp180_get_P_hPa () * 100);
-			break;
-		}
 		case 0:	// ничего не подключено
 		{
-			/*printf ("%4.1f\n", gyro_data.gX);*/
-			/*printf ("a%3d\n", adc_val >> 2);*/
-			printf ("%2d:%2d\n", (int)omega_obj.omegaL, (int)omega_obj.omegaR);
+			printf ("%4.1f\n", gyro_data.gZ * 180/3.14);
+			/*printf ("%4d\n", pot_val >> 2);*/
+			/*printf ("%2d:%2d\n", (int)omega.omegaL, (int)omega.omegaR);*/
 			/*printf ("%.1f\n", bmp180_get_P_mmHg ());*/
+			/*printf("%4.1f\n", setval);*/
+			
+			/*__motors_set_thrust((int16_t)(pot_val >> 2), (int16_t)(pot_val >> 2));*/
+			
+			/*motors_set_omega(5.0, 5.0);*/
+			
+			/*motors_set_omega(setval, setval);*/
+			
+			mcontrol_set(setval, 0.0);
+			
+			break;
+		}
+		case ((1 << BUT1) | (1 << BUT0)):	// нажата кнопка + провод на PB0
+		{
+			/*bmp180_set_P0 (bmp180_get_P_hPa () * 100);*/
+			
 			break;
 		}
 		case (1 << BUT0):
 		{
 			/*printf ("%4.1f\n", bmp180_get_h ());*/
 			/*printf ("%4.1f\n", gyro_data.gY);*/
-			/*printf ("a%3.1f\n", adc_val / 100.0);*/
+			/*printf ("%4d\n", -1*(pot_val >> 2));*/
 			/*printf ("t%3.1f\n", bmp180_get_T());*/
 			/*printf ("a%3d\n", adc_val >> 2);*/
 			/*printf ("r%4.1f\n", omega.omegaR);*/
+			/*printf ("%2d:%2d\n", (int)omega.omegaL, (int)omega.omegaR);*/
+			
+			__motors_set_thrust(-1*(pot_val >> 2), -1*(pot_val >> 2));
+			
+			/*motors_set_omega(-5.0, -5.0);*/
+			
+			/*motors_set_omega(-setval, -setval);*/
+			
+			/*mcontrol_set(-setval, 0.0);*/
+			
 			break;
 		}
 		case (1 << BUT2):
 		{
-			printf ("%d\n", pot_val);
+			/*printf ("%d\n", pot_val);*/
 			/*printf ("%4.1f\n", gyro_data.gZ);*/
 			/*printf ("%4.1f\n", power.powL);*/
 			/*printf ("%4.1f\n", bmp180_get_dhdt ());*/
+			
+			__MOTORS_CTRL_L_STOP; __MOTORS_CTRL_R_STOP;
+			
 			break;
 		}
 		case (1 << BUT3):
 		{
 			/*printf ("%4.1f\n", gyro_data.gZ);*/
 			/*printf ("%4.1f\n", accel_data.aZ);*/
+			
 			break;
 		}
 	}

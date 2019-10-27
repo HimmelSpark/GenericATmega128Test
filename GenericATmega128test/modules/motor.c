@@ -6,6 +6,7 @@
  */ 
 
 #include "../general.h"
+#include <math.h>
 #include "motor.h"
 #include "../rtos.h"
 #include "md3.h"
@@ -13,14 +14,19 @@
 #include <util/atomic.h>
 #include "../displays/_7seg_disp.h"
 
-volatile uint32_t __enc_L_pulses = 0;
-volatile uint32_t __enc_R_pulses = 0;
-// u32 хватит на ~3453 километра пути
-
-MOTOR_OMEGA_DATA __omega_objective;					// структура уставок
+volatile int32_t __enc_L_pulses = 0;
+volatile int32_t __enc_R_pulses = 0;
+// u32 хватит на +-1700 километров пути
 
 double __omega_L_raw = 0.0, __omega_R_raw = 0.0;	// оценки производных,
 													// не умноженные на масштабирующий коэффициент
+													
+double __omega_obj_L = 0.0, __omega_obj_R = 0.0;	// уставки для ПИ-регулятора
+
+
+//TODO: регистр состояния
+
+//static volatile uint8_t motors_status_lo, motors_status_hi;
 
 static uint8_t __estimator_reset = 1;	// флаг сброса оценивателя;
 // static потому, что переменная с таким же именем используется в оценивателе в bmp180.c
@@ -30,18 +36,17 @@ uint8_t __picontroller_reset	 = 1;	// флаг сброса регулятора
 uint8_t __motor_L_reached_constr = 0;	// флаг достижения L двигателем ограничения PWM
 uint8_t __motor_R_reached_constr = 0;	// флаг достижения R двигателем ограничения PWM
 
-volatile uint8_t __enc_L_en = 1, __enc_R_en = 1;	// флаги разрешения чтения энкодеров
-
 uint8_t __motors_disarmed = 1;			// флаг состояния двигателей
 uint8_t __motors_disarm_armed = 0;		// флаг подготовки отключения двигателей
+
+volatile uint8_t __enc_L_en = 1, __enc_R_en = 1;	// флаги разрешения чтения энкодеров
 
 __debug_picontr_data picontr;
 
 inline void __enc_L (void)
-{	// ISR
-	__DEBUG_PIN_SWITCH;
-	
+{// ISR
 	// Данное прерывание "будит" оцениватель скорости, если он ещё не работает
+	
 	if (__estimator_reset)
 	{	// Если оцениватель подготовлен к запуску, запускаем его
 		rtos_set_task (__motors_omega_estimator, RTOS_RUN_ASAP, ESTIM_PERIOD);
@@ -49,10 +54,20 @@ inline void __enc_L (void)
 	
 	if (__enc_L_en)
 	{
+		__DEBUG_PIN_SWITCH;
 		__enc_L_en = 0;
-		__enc_L_pulses++;
+		
+		// Определяем направление движения (см. осцилограммы)
+		if ((ENCODERS_PIN & (1 << ENC_L_B_PIN)) == 0x00)
+		{
+			__enc_L_pulses++;
+		}
+		else
+		{
+			__enc_L_pulses--;
+		}
 	
-		// Через некоторое время (не более 500 мкс) разрешим чтение:
+// 		// Через некоторое время (не более 500 мкс) разрешим чтение:
 		OCR3B = TCNT3 + (uint16_t)ENC_FILTER_TIME; // мкс
 		ETIMSK |= 1 << OCIE3B;	// прерывание по совпадению с OCR3B
 	}
@@ -61,8 +76,9 @@ inline void __enc_L (void)
 }
 
 inline void __enc_R (void)
-{	// ISR
+{// ISR
 	// Данное прерывание "будит" оцениватель скорости, если он ещё не работает
+	
 	if (__estimator_reset)
 	{	// Если оцениватель подготовлен к запуску, запускаем его
 		rtos_set_task (__motors_omega_estimator, RTOS_RUN_ASAP, ESTIM_PERIOD);
@@ -71,7 +87,16 @@ inline void __enc_R (void)
 	if (__enc_R_en)
 	{
 		__enc_R_en = 0;
-		__enc_R_pulses++;
+	
+		// Определяем направление движения (см. осцилограммы)
+		if ((ENCODERS_PIN & (1 << ENC_R_B_PIN)) == 0x00)
+		{
+			__enc_R_pulses--;
+		}
+		else
+		{
+			__enc_R_pulses++;
+		}
 		
 		// Через некоторое время (не более 500 мкс) разрешим чтение:
 		OCR3C = TCNT3 + (uint16_t)ENC_FILTER_TIME; // мкс
@@ -82,7 +107,7 @@ inline void __enc_R (void)
 }
 
 inline void __enc_L_enable (void)
-{	// ISR
+{// ISR
 	__enc_L_en = 1;
 	ETIMSK &= ~(1 << OCIE3B);	// это прерывание больше не нужно
 	
@@ -90,7 +115,7 @@ inline void __enc_L_enable (void)
 }
 
 inline void __enc_R_enable (void)
-{	// ISR
+{// ISR
 	__enc_R_en = 1;
 	ETIMSK &= ~(1 << OCIE3C);	// это прерывание больше не нужно
 	
@@ -103,11 +128,33 @@ void __motors_set_thrust (int16_t thrust_L, int16_t thrust_R)
 	int8_t sgn_L = (thrust_L >= 0) ? MOTORS_THRUST_POS : MOTORS_THRUST_NEG;
 	int8_t sgn_R = (thrust_R >= 0) ? MOTORS_THRUST_POS : MOTORS_THRUST_NEG;
 	
-	//* Далее следует коммутация железа в соответствии с этими знаками *//
-	// ...
-	// ... но пока железо к такому не готово.
-	// ...
-	//******************************************************************//
+	// Коммутация железа в соответствии с этими знаками:
+	switch (sgn_L)
+	{
+		case MOTORS_THRUST_POS:
+		{
+			__MOTORS_CTRL_L_FWD;
+			break;
+		}
+		case MOTORS_THRUST_NEG:
+		{
+			__MOTORS_CTRL_L_REV;
+			break;
+		}
+	}
+	switch (sgn_R)
+	{
+		case MOTORS_THRUST_POS:
+		{
+			__MOTORS_CTRL_R_FWD;
+			break;
+		}
+		case MOTORS_THRUST_NEG:
+		{
+			__MOTORS_CTRL_R_REV;
+			break;
+		}
+	}
 	
 	// Знаки запомнили, теперь получим модули управлений:
 	thrust_L *= sgn_L;
@@ -126,18 +173,14 @@ void __motors_set_thrust (int16_t thrust_L, int16_t thrust_R)
 	}
 	
 	/*** Управление для двигателя L ***/
-	if (sgn_L == MOTORS_THRUST_NEG)
-	{	// ВРЕМЕННО, пока нет реверсивного управления!
-		MOTOR_L_OCR = 0;
-	}
-	else if (thrust_L == 0)
+	if (thrust_L == 0)
 	{	// Остановка только в случае точного 0
 		MOTOR_L_OCR = 0;
 	}
-	else if (thrust_L < MOTORS_PWM_TRS)
-	{	// Если управление хотя бы немного больше 0 и меньше порога, то обеспечиваем страгивание:
-		MOTOR_L_OCR = MOTORS_PWM_TRS;
-	}
+// 	else if (thrust_L < MOTORS_PWM_TRS)
+// 	{	// Если управление хотя бы немного больше 0 и меньше порога, то обеспечиваем страгивание:
+// 		MOTOR_L_OCR = MOTORS_PWM_TRS;
+// 	}
 	else if (thrust_L >= MOTORS_PWM_CONSTR_MAX)
 	{	// Управление превысило максимум:
 		MOTOR_L_OCR = MOTORS_PWM_CONSTR_MAX;
@@ -151,18 +194,14 @@ void __motors_set_thrust (int16_t thrust_L, int16_t thrust_R)
 	
 	
 	/*** Управление для двигателя R ***/
-	if (sgn_R == MOTORS_THRUST_NEG)
-	{	// ВРЕМЕННО, пока нет реверсивного управления!
-		MOTOR_R_OCR = 0;
-	}
-	else if (thrust_R == 0)
+	if (thrust_R == 0)
 	{	// Остановка только в случае точного 0
 		MOTOR_R_OCR = 0;
 	}
-	else if (thrust_R < MOTORS_PWM_TRS)
-	{	// Если управление хотя бы немного больше 0 и меньше порога, то обеспечиваем страгивание:
-		MOTOR_R_OCR = MOTORS_PWM_TRS;
-	}
+// 	else if (thrust_R < MOTORS_PWM_TRS)
+// 	{	// Если управление хотя бы немного больше 0 и меньше порога, то обеспечиваем страгивание:
+// 		MOTOR_R_OCR = MOTORS_PWM_TRS;
+// 	}
 	else if (thrust_R >= MOTORS_PWM_CONSTR_MAX)
 	{	// Управление превысило максимум:
 		MOTOR_R_OCR = MOTORS_PWM_CONSTR_MAX;
@@ -175,22 +214,21 @@ void __motors_set_thrust (int16_t thrust_L, int16_t thrust_R)
 	}
 	
 	
-	if (__motor_L_reached_constr || __motor_R_reached_constr)
-	{	// Если достигнут максимум хотя бы одним двигателем
-		if (!__motors_disarm_armed)
-		{	// И ещё не подготовили отключение двигателей,
-			rtos_set_task (motors_disarm, 1000, RTOS_RUN_ONCE);	// делаем это сейчас
-			__motors_disarm_armed = 1;							// подготовили
-			uart_puts ("[ ! ] One of motors exceeded constraint. Motors will be disarmed in 1 s\n");
-			uart_puts ("      if at least one motor continues exceeding constraint\n");
-		}
-	}
-	else if (__motors_disarm_armed)
-	{	// Если не превышаем ограничения, а отключение подготовлено, то отменяем его
-		rtos_delete_task (motors_disarm);
-		__motors_disarm_armed = 0;
-		uart_puts ("[ ! ] Motors disarm cancelled\n");
-	}
+// 	if (__motor_L_reached_constr || __motor_R_reached_constr)
+// 	{	// Если достигнут максимум хотя бы одним двигателем
+// 		if (!__motors_disarm_armed)
+// 		{	// И ещё не подготовили отключение двигателей,
+// 			rtos_set_task (motors_disarm, 1000, RTOS_RUN_ONCE);	// делаем это сейчас
+// 			__motors_disarm_armed = 1;							// подготовили
+// 			uart_puts ("[ ! ] One of motors exceeded constraint. Motors will be disarmed in 1 s\n");
+// 		}
+// 	}
+// 	else if (__motors_disarm_armed)
+// 	{	// Если не превышаем ограничения, а отключение подготовлено, то отменяем его
+// 		rtos_delete_task (motors_disarm);
+// 		__motors_disarm_armed = 0;
+// 		uart_puts ("[ ! ] Motors disarm cancelled\n");
+// 	}
 	
 	
 	return;
@@ -262,7 +300,7 @@ void __motors_omega_estimator (void)
 		
 		uart_puts ("[ OK ] Estimator engaged\n");
 	}
-	else if ((__omega_L_raw <= ESTIM_RAW_OMEGA_TRS) && (__omega_R_raw <= ESTIM_RAW_OMEGA_TRS))
+	else if ((abs((int)__omega_L_raw) <= ESTIM_RAW_OMEGA_TRS) && (abs((int)__omega_R_raw) <= ESTIM_RAW_OMEGA_TRS))
 	{	// Если оцениватель не находится в состоянии сброса и если скорость близка к нулю, то 
 		// подготовим отключение оценивателя......
 		if (!__estimator_diseng_armed)
@@ -387,7 +425,7 @@ void __motors_omega_estimator_diseng (void)
 	__estimator_diseng_armed = 0;
 		
 	rtos_delete_task (__motors_omega_estimator);
-	uart_puts ("[ OK ] Estimator disengaged\n");
+	uart_puts ("[ OK ] Estimator disengage and reset done\n");
 	
 	return;
 }
@@ -396,7 +434,7 @@ void __motors_pi_controller (void)
 {
 	static double I_L = 0.0, I_R = 0.0;
 	double eps_L, eps_R;
-	static int16_t u_L, u_R;	// может появиться знак
+	static int16_t u_L, u_R;
 		
 	MOTOR_OMEGA_DATA omega = motors_get_omega ();
 	
@@ -411,9 +449,9 @@ void __motors_pi_controller (void)
 		uart_puts ("[ OK ] PI-controller engaged\n");
 	}
 	else if ((__omega_L_raw == 0.0) && (__omega_R_raw == 0.0) && \
-				(__omega_objective.omegaL == 0.0) && (__omega_objective.omegaR == 0.0))
+				(__omega_obj_L == 0.0) && (__omega_obj_R == 0.0))
 	{	// Если остановились и не хотим больше двигаться, то ПИ-регулятор больше не нужен
-		// (точное равенство нулю оценок скоростей обеспечивается оценивателем)
+		// (точное равенство нулю оценок скоростей при остановке обеспечивается оценивателем)
 		__picontroller_reset = 1;
 		rtos_delete_task (__motors_pi_controller);
 		_7seg_puts ("stby\n");
@@ -424,7 +462,7 @@ void __motors_pi_controller (void)
 
 	/* Вычисления для двигателя L */
 
-	eps_L = __omega_objective.omegaL - omega.omegaL;
+	eps_L = __omega_obj_L - omega.omegaL;
 		
 	if (__motor_L_reached_constr && (eps_L >= 0.0))
 	{	// достигли ограничения ШИМ, и снижения не предвидится
@@ -432,9 +470,9 @@ void __motors_pi_controller (void)
 		eps_L = 0.0;	// делаем вид, что это и есть целевая скорость
 	}
 	I_L +=  eps_L * PICONTR_CONST_Ki * PICONTR_CONST_dT;
-	if (__omega_objective.omegaL == 0.0)
+	if (__omega_obj_L == 0.0)
 	{
-		u_L = 0;	// лучший способ остановиться
+		u_L = 0;	// наискорейшая остановка
 	}
 	else
 	{
@@ -443,7 +481,7 @@ void __motors_pi_controller (void)
 	
 	/* Вычисления для двигателя R */
 	
-	eps_R = __omega_objective.omegaR - omega.omegaR;
+	eps_R = __omega_obj_R - omega.omegaR;
 		
 	if (__motor_R_reached_constr && (eps_R >= 0.0))
 	{	// достигли ограничения ШИМ, и снижения не предвидится
@@ -451,9 +489,9 @@ void __motors_pi_controller (void)
 		eps_R = 0.0;	// делаем вид, что это и есть целевая скорость
 	}
 	I_R +=  eps_R * PICONTR_CONST_Ki * PICONTR_CONST_dT;
-	if (__omega_objective.omegaR == 0.0)
+	if (__omega_obj_R == 0.0)
 	{
-		u_R = 0;	// лучший способ остановиться
+		u_R = 0;	// наискорейшая остановка
 	}
 	else
 	{
@@ -474,18 +512,20 @@ void __motors_pi_controller (void)
 
 inline void motors_init (void)
 {
+	MOTORS_PWM_DDR	|= (1 << MOTOR_L_PWM_PIN) | (1 << MOTOR_R_PWM_PIN);		// выход
+	MOTORS_PWM_PORT	&= ~((1 << MOTOR_L_PWM_PIN) | (1 << MOTOR_R_PWM_PIN));	// кидаем на землю
 	
-	MOTORS_DDR	|= (1 << MOTOR_L_PWM_PIN) | (1 << MOTOR_R_PWM_PIN);		// выход
-	MOTORS_PORT	&= ~((1 << MOTOR_L_PWM_PIN) || (1 << MOTOR_R_PWM_PIN));	// пока кидаем на землю
+	MOTORS_CTRL_DDR |= (1 << MOTORS_CTRL_IN1) | (1 << MOTORS_CTRL_IN2) | 	// выход
+						(1 << MOTORS_CTRL_IN3) | (1 << MOTORS_CTRL_IN4);	// выход
+	__MOTORS_CTRL_L_STOP;													// кидаем на землю
+	__MOTORS_CTRL_R_STOP;													// кидаем на землю
 	
 	/* Настройка PWM */
-	
 	TCCR1A |= 1 << WGM10;	// Fast
 	TCCR1B |= 1 << WGM12;	// PWM
 	
-	/* Настройка прерываний энкодеров (rising edge) */
-	
-	EICRA |= (1 << ISC31) | (1 << ISC30) | (1 << ISC21) | (1 << ISC20);
+	/* Настройка прерываний энкодеров (rising edge INT6,7) */
+	EICRB |= (1 << ISC51) | (1 << ISC50) | (1 << ISC41) | (1 << ISC40);
 	
 	rtos_set_task (motors_arm, MOTORS_STARTUP_TIME, RTOS_RUN_ONCE);
 	
@@ -501,23 +541,25 @@ void motors_arm (void)
 		uart_puts ("[ FAIL ] ARM not available in motion\n");
 	}
 	else if (__motors_disarmed)
-	{	// Армируем только если был дисарм; нет смысла несколько раз армировать
+	{	// Армируем только если был дизарм; нет смысла несколько раз армировать
 		/* Настройка PWM */
 		MOTOR_L_OCR = 0;
 		MOTOR_R_OCR = 0;
-		TCCR1B |= (0 << CS12) | (0 << CS11) | (1 << CS10);	// запуск таймера ШИМ
 		TCCR1A |= (1 << COM1B1) | (1 << COM1C1);			// подключаем двигатели к OCR1B/C
+		TCCR1B |= (0 << CS12) | (1 << CS11) | (1 << CS10);	// запуск таймера ШИМ
 		
 		/* Запуск таймера фильтра ложных прерываний */
 		TCCR3B |= (0 << CS32) | (1 << CS31) | (0 << CS30);	// счёт каждую 1 мкс
 		
 		/* Включение прерываний датчиков */
-		EIFR |= (1 << INTF3) | (1 << INTF2);	// на всякий случай сбросим флаги (установкой единиц)
-		EIMSK |= (1 << INT3) | (1 << INT2);		// непосредственно включаем
+		// на всякий случай сбросим флаги (установкой единиц):
+		EIFR |= (1 << INTF5) | (1 << INTF4);
+		// непосредственно включаем:
+		EIMSK |= (1 << INT5) | (1 << INT4);	
 
 		// На всякий случай обнулим уставки
-		__omega_objective.omegaL = 0.0;
-		__omega_objective.omegaR = 0.0;
+		__omega_obj_L = 0.0;
+		__omega_obj_R = 0.0;
 		
 		__picontroller_reset = 1;	// На всякий случай принудительно сбросим ПИ-регулятор
 									// (вообще, он сбрасывается сам при условии остановки
@@ -538,28 +580,30 @@ void motors_arm (void)
 
 void motors_disarm (void)
 {	
-	// Максимально быстро отрубаем двигатели
-	TCCR1A &= ~((1 << COM1B1) | (1 << COM1C1));				// отключаем двигатели от OCR1B/C
-	// Чтобы гарантировать остановку двигателей, явно кинем их на землю:
-	MOTORS_PORT	&= ~((1 << MOTOR_L_PWM_PIN) || (1 << MOTOR_R_PWM_PIN));
+	// Отключим пины ШИМ от OCR1B/C
+	TCCR1A &= ~((1 << COM1B1) | (1 << COM1C1));
+	// Гарантированно остановим двигатели:
+	__MOTORS_CTRL_L_STOP;
+	__MOTORS_CTRL_R_STOP;
+	MOTORS_PWM_PORT	&= ~((1 << MOTOR_L_PWM_PIN) || (1 << MOTOR_R_PWM_PIN));
 	// Обнулим регистры сравнения ШИМ:
 	MOTOR_L_OCR = 0;
 	MOTOR_R_OCR = 0;
 	TCCR1B &= ~((1 << CS12) | (1 << CS11) | (1 << CS10));	// отключаем любые источники тактирования ШИМ
 	
 	// Выключение прерываний датчиков 
-	EIMSK &= ~((1 << INT3) | (1 << INT2));
+	EIMSK &= ~((1 << INT5) | (1 << INT4));
 	// Остановка таймера фильтра ложных прерываний
 	TCCR3B &= ~((1 << CS32) | (1 << CS31) | (1 << CS30));
 	
 	// Необходимое условие отключения ПИ-регулятора
-	__omega_objective.omegaL = 0.0;
-	__omega_objective.omegaR = 0.0;
+	__omega_obj_L = 0.0;
+	__omega_obj_R = 0.0;
 	// ПИ-регулятор и оцениватель скорости отключатся автоматически;
 	// нет необходимости делать это вручную
 	
 	__motors_disarmed = 1;		// дизармировали
-	__motors_disarm_armed = 0;	// дисзарм не подготовлен (сброс на тот случай, если 
+	__motors_disarm_armed = 0;	// дизарм не подготовлен (сброс на тот случай, если 
 								// мы сюда попали по автоматическому отключению)
 	
 	uart_puts ("[ OK ] Motors DISARMED\n");
@@ -579,8 +623,8 @@ MOTOR_OMEGA_DATA motors_get_omega (void)
 MOTOR_OMEGA_DATA motors_get_omega_obj (void)
 {
 	MOTOR_OMEGA_DATA omega;
-	omega.omegaL = __omega_objective.omegaL;
-	omega.omegaR = __omega_objective.omegaR;
+	omega.omegaL = __omega_obj_L;
+	omega.omegaR = __omega_obj_R;
 	
 	return omega;
 }
@@ -599,27 +643,28 @@ MOTOR_POWER_DATA motors_get_power (void)
 	// Задание уставки при DISARM запрещено
 	if (!__motors_disarmed)
 	{	
-		if (__picontroller_reset && ((omega_L >= MOTORS_OMEGA_OBJ_MIN) || (omega_R >= MOTORS_OMEGA_OBJ_MIN)))
+		if (__picontroller_reset && ((fabs(omega_L) >= MOTORS_OMEGA_OBJ_MIN) || 
+										(fabs(omega_R) >= MOTORS_OMEGA_OBJ_MIN)))
 		{// "Будим" ПИ-регулятор, если он ещё не работает:
 			rtos_set_task (__motors_pi_controller, RTOS_RUN_ASAP, PICONTR_PERIOD);
 		}
 		
-		if (omega_L >= MOTORS_OMEGA_OBJ_MIN)
+		if (fabs(omega_L) >= MOTORS_OMEGA_OBJ_MIN)
 		{
-			__omega_objective.omegaL = omega_L;
+			__omega_obj_L = omega_L;
 		}
 		else
 		{
-			__omega_objective.omegaL = 0.0;
+			__omega_obj_L = 0.0;
 		}
 		
-		if (omega_R >= MOTORS_OMEGA_OBJ_MIN)
+		if (fabs(omega_R) >= MOTORS_OMEGA_OBJ_MIN)
 		{
-			__omega_objective.omegaR = omega_R;
+			__omega_obj_R = omega_R;
 		}
 		else
 		{
-			__omega_objective.omegaR = 0.0;
+			__omega_obj_R = 0.0;
 		}
 	}
 // 	else

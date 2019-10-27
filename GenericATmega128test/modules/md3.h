@@ -49,9 +49,9 @@ uint16_t md3_get_pot (void);	// положение потенциометра
 #define MD3_POT_MAX			1000
 #define MD3_POT_TRS			23		// мёртвая зона (для исключения дребезга нуля)
 
-#define DEBUG_PORT			PORTE
-#define DEBUG_DDR			DDRE
-#define DEBUG_PIN			PE6
+#define DEBUG_PORT			PORTF
+#define DEBUG_DDR			DDRF
+#define DEBUG_PIN			PF1
 
 #define __DEBUG_PIN_HIGH	DEBUG_PORT |= 1 << DEBUG_PIN
 #define __DEBUG_PIN_LOW		DEBUG_PORT &= ~(1 << DEBUG_PIN)

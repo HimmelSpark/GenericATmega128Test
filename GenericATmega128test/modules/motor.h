@@ -125,7 +125,7 @@ void motors_set_omega (double omega_L, double omega_R); // Задать уста
 
 #define ENC_FILTER_TIME				500		// us; для фильтра ложных прерываний
 
-//#define MOTORS_PWM_TRS				40		// экспериментально установленный порог страгивания
+#define MOTORS_PWM_TRS				50		// экспериментально установленный порог страгивания
 #define MOTORS_PWM_CONSTR_MAX		200		// ограничение сверху
 
 #define MOTORS_THRUST_POS			1
@@ -152,7 +152,7 @@ void motors_set_omega (double omega_L, double omega_R); // Задать уста
 // #define USE_OVF_HANDLER					// "скручивать" переменные оценивателя при больших значениях
 // #define ESTIMATOR_OVF_VAL	100000		// предел счётчика импульсов
 
-#define ESTIM_DISENG_DELAY	2000		// ms; задержка перед отключением оценивателя
+#define ESTIM_DISENG_DELAY		2000	// ms; задержка перед отключением оценивателя
 #define ESTIM_RAW_OMEGA_TRS		10		// имп/с; меньшие скорости считаются нулевыми
 
 #define ESTIM_PERIOD		10			// ms; период вызова алгоритма оценки
@@ -165,8 +165,8 @@ void motors_set_omega (double omega_L, double omega_R); // Задать уста
 
 #define PICONTR_PERIOD		10			// ms
 #define PICONTR_CONST_dT	0.01		// s
-#define PICONTR_CONST_Kp	3.0
-#define PICONTR_CONST_Ki	12.0
+#define PICONTR_CONST_Kp	5.0
+#define PICONTR_CONST_Ki	3.0
 
 #define MOTORS_OMEGA_OBJ_MAX		40.0	// рад/с; максимальная уставка
 #define MOTORS_OMEGA_OBJ_MIN		1.0		// рад/с; меньшие скорости не гарантируем

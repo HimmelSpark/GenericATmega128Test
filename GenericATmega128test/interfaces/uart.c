@@ -13,6 +13,7 @@
 
 #include "../modules/motor.h"
 #include "../motion_control.h"
+#include "../displays/lcd.h"
 
 extern void show_info_uart(void);
 
@@ -37,6 +38,8 @@ uint8_t __uart_ready = 0;		// если UART не инициализирован, передача байтов буде
 	uart_clrscr ();
 	uart_home ();
 	uart_puts ("[ OK ] UART Alive\n");
+	
+//	uart_puts("AT+B9600");
 	
 	return;
 }
@@ -119,7 +122,7 @@ inline void __uart_tx_routine (void)
 {	// ¬ызов по прерыванию
 	// UDR готов, пишем в него из буфера:
 	UDR0 = fifo_pop (&__uart_tx_buf);
-	// ¬нимание! Ќотаци€ точечна€, т.к. работаем с буфером напр€мую, а не через указатель:
+	// Ќотаци€ точечна€, т.к. работаем с буфером напр€мую, а не через указатель:
 	if (__uart_tx_buf.idxOut == __uart_tx_buf.idxIn)
 	{	// если на данный момент передать больше нечего,
 		UCSR0B &= ~(1 << UDRIE0);	// отключаем данное прерывание
@@ -145,76 +148,81 @@ inline void __uart_rx_byte (void)
 			motors_disarm ();
 			break;
 		}
+		case 'c':
+		{
+			mcontrol_course_reset ();
+			break;
+		}
 		case '0':
 		{
-			motors_set_omega (0.0, 0.0);
-			uart_puts ("[ OK ] 0.0; 0.0 SET\n");
-// 			mcontrol_set (0.0, 0.0);
-// 			uart_puts ("[ OK ] 0.0 m/s; 0.0 rad/s SET\n");
+// 			motors_set_omega (0.0, 0.0);
+// 			uart_puts ("[ OK ] 0.0; 0.0 SET\n");
+			mcontrol_set (0.0, 0.0);
+			uart_puts ("[ OK ] 0.0 m/s; 0.0 rad/s SET\n");
 			break;
 		}
 		case '1':
 		{
-			motors_set_omega (3.0, 3.0);
-			uart_puts ("[ OK ] 3.0; 3.0 SET\n");
-// 			mcontrol_set (0.1, 0.0);
-// 			uart_puts ("[ OK ] 0.1 m/s; 0.0 rad/s SET\n");
+// 			motors_set_omega (3.0, 3.0);
+// 			uart_puts ("[ OK ] 3.0; 3.0 SET\n");
+			mcontrol_set (0.1, 0.0);
+			uart_puts ("[ OK ] 0.1 m/s; 0.0 rad/s SET\n");
 			break;
 		}
 		case '2':
 		{
-			motors_set_omega (6.0, 6.0);
-			uart_puts ("[ OK ] 6.0; 6.0 SET\n");
-// 			mcontrol_set (0.2, 0.0);
-// 			uart_puts ("[ OK ] 0.2 m/s; 0.0 rad/s SET\n");
+// 			motors_set_omega (6.0, 6.0);
+// 			uart_puts ("[ OK ] 6.0; 6.0 SET\n");
+			mcontrol_set (0.2, 0.0);
+			uart_puts ("[ OK ] 0.2 m/s; 0.0 rad/s SET\n");
 			break;
 		}
 		case '3':
 		{
-			motors_set_omega (9.0, 9.0);
-			uart_puts ("[ OK ] 9.0; 9.0 SET\n");
-// 			mcontrol_set (0.3, 0.0);
-// 			uart_puts ("[ OK ] 0.3 m/s; 0.0 rad/s SET\n");
+// 			motors_set_omega (9.0, 9.0);
+// 			uart_puts ("[ OK ] 9.0; 9.0 SET\n");
+			mcontrol_set (0.3, 0.0);
+			uart_puts ("[ OK ] 0.3 m/s; 0.0 rad/s SET\n");
 			break;
 		}
 		case '4':
 		{
-			motors_set_omega (12.0, 12.0);
-			uart_puts ("[ OK ] 12.0; 12.0 SET\n");
-// 			mcontrol_set (0.4, 0.0);
-// 			uart_puts ("[ OK ] 0.4 m/s; 0.0 rad/s SET\n");
+// 			motors_set_omega (12.0, 12.0);
+// 			uart_puts ("[ OK ] 12.0; 12.0 SET\n");
+			mcontrol_set (0.4, 0.0);
+			uart_puts ("[ OK ] 0.4 m/s; 0.0 rad/s SET\n");
 			break;
 		}
 		case '5':
 		{
-			motors_set_omega (15.0, 15.0);
-			uart_puts ("[ OK ] 15.0; 15.0 SET\n");
-// 			mcontrol_set (0.5, 0.0);
-// 			uart_puts ("[ OK ] 0.5 m/s; 0.0 rad/s SET\n");
+// 			motors_set_omega (15.0, 15.0);
+// 			uart_puts ("[ OK ] 15.0; 15.0 SET\n");
+			mcontrol_set (0.5, 0.0);
+			uart_puts ("[ OK ] 0.5 m/s; 0.0 rad/s SET\n");
 			break;
 		}
 		case '6':
 		{
-			motors_set_omega (18.0, 18.0);
-			uart_puts ("[ OK ] 18.0; 18.0 SET\n");
-// 			mcontrol_set (0.6, 0.0);
-// 			uart_puts ("[ OK ] 0.6 m/s; 0.0 rad/s SET\n");
+// 			motors_set_omega (18.0, 18.0);
+// 			uart_puts ("[ OK ] 18.0; 18.0 SET\n");
+			mcontrol_set (0.6, 0.0);
+			uart_puts ("[ OK ] 0.6 m/s; 0.0 rad/s SET\n");
 			break;
 		}
-		case 'l':	// поворачиваем налево
+		case '[':	// поворачиваем налево
 		{
-			motors_set_omega (3.0, 6.0);
-			uart_puts ("[ OK ] 3.0; 6.0 SET. Target OMEGA = 28 deg/s\n");
-// 			mcontrol_set (0.1, 0.5);
-// 			uart_puts ("[ OK ] 0.1 m/s; 0.5 rad/s SET\n");
+// 			motors_set_omega (3.0, 6.0);
+// 			uart_puts ("[ OK ] 3.0; 6.0 SET. Target OMEGA = 28 deg/s\n");
+			mcontrol_set (0.1, 0.5);
+			uart_puts ("[ OK ] 0.1 m/s; 0.5 rad/s SET\n");
 			break;
 		}
-		case 'r':	// поворачиваем направо
+		case ']':	// поворачиваем направо
 		{
-			motors_set_omega (6.0, 3.0);
-			uart_puts ("[ OK ] 6.0; 3.0 SET. Target OMEGA = -28 deg/s\n");
-// 			mcontrol_set (0.1, -0.5);
-// 			uart_puts ("[ OK ] 0.1 m/s; -0.5 rad/s SET\n");
+// 			motors_set_omega (6.0, 3.0);
+// 			uart_puts ("[ OK ] 6.0; 3.0 SET. Target OMEGA = -28 deg/s\n");
+			mcontrol_set (0.1, -0.5);
+			uart_puts ("[ OK ] 0.1 m/s; -0.5 rad/s SET\n");
 			break;
 		}
 		case 'b':	// отладочна€ информаци€
@@ -225,9 +233,9 @@ inline void __uart_rx_byte (void)
 				uart_clrscr ();
 				uart_home ();
 				uart_puts ("~~~DEBUG MODE BEGIN~~~\n");
-//				uart_puts ("obj_L omega_L eps_L I_L u_L obj_R omega_R eps_R I_R u_R\nevery 0.1 s\n");
-				uart_puts ("eng1 [rad/s]|eng2 [rad/s]  |  gZ [deg/s] |  Vel [m/s]\n\nEvery 0.1 s\n\n");
-				rtos_set_task (show_info_uart, 1000, 100);
+//				uart_puts ("obj_L omega_L eps_L I_L u_L obj_R omega_R eps_R I_R u_R\nevery 0.3 s\n");
+				uart_puts ("eng1 [rad/s]|eng2 [rad/s]  |  gZ [deg/s] |  Vel [m/s]\n\nEvery 0.3 s\n\n");
+				rtos_set_task (show_info_uart, 1000, 300);
 			}
 			else
 			{

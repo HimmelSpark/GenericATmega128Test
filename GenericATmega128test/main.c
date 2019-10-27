@@ -101,7 +101,7 @@ int main (void)
 	rtos_init ();
 	
 	md3_init ();
-//	uart_init ();
+	uart_init ();
 	i2c_init ();
 //	lcd_init ();
 	_7seg_init ();
@@ -113,7 +113,7 @@ int main (void)
 // 	stdout = &_LCD_;
 // 	stdout = &_UART_;
 	
-	rtos_set_task (show_info_7seg, 1000, 100);
+//	rtos_set_task (show_info_7seg, 1000, 100);
 // 	rtos_set_task (show_info_lcd, 1010, 100);
 // 	rtos_set_task (show_info_uart, 1050, 100);
 	
@@ -227,12 +227,14 @@ void show_info_lcd (void)
 void show_info_7seg (void)
 {
 // 	MPU6050_ACCEL_DATA accel_data = mpu6050_get_accel ();
-// 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
+ 	MPU6050_GYRO_DATA gyro_data = mpu6050_get_gyro ();
   MOTOR_OMEGA_DATA omega = motors_get_omega ();
 //  MOTOR_OMEGA_DATA omega_obj = motors_get_omega_obj ();
 // 	MOTOR_POWER_DATA power = motors_get_power ();
 
 	uint16_t pot_val = md3_get_pot ();
+	
+	double setval = ((double)pot_val/(double)MD3_POT_MAX) * 0.5;
 	
 	stdout = &_7SEG_;
 
@@ -240,16 +242,19 @@ void show_info_7seg (void)
 	{
 		case 0:	// ничего не подключено
 		{
-			/*printf ("%4.1f\n", gyro_data.gX);*/
+			printf ("%4.1f\n", gyro_data.gZ * 180/3.14);
 			/*printf ("%4d\n", pot_val >> 2);*/
-			printf ("%2d:%2d\n", (int)omega.omegaL, (int)omega.omegaR);
+			/*printf ("%2d:%2d\n", (int)omega.omegaL, (int)omega.omegaR);*/
 			/*printf ("%.1f\n", bmp180_get_P_mmHg ());*/
+			/*printf("%4.1f\n", setval);*/
 			
 			/*__motors_set_thrust((int16_t)(pot_val >> 2), (int16_t)(pot_val >> 2));*/
 			
 			/*motors_set_omega(5.0, 5.0);*/
 			
-			mcontrol_set(0.5, 0.0);
+			/*motors_set_omega(setval, setval);*/
+			
+			mcontrol_set(setval, 0.0);
 			
 			break;
 		}
@@ -267,13 +272,15 @@ void show_info_7seg (void)
 			/*printf ("t%3.1f\n", bmp180_get_T());*/
 			/*printf ("a%3d\n", adc_val >> 2);*/
 			/*printf ("r%4.1f\n", omega.omegaR);*/
-			printf ("%2d:%2d\n", (int)omega.omegaL, (int)omega.omegaR);
+			/*printf ("%2d:%2d\n", (int)omega.omegaL, (int)omega.omegaR);*/
 			
-			/*__motors_set_thrust(-1*(pot_val >> 2), -1*(pot_val >> 2));*/
+			__motors_set_thrust(-1*(pot_val >> 2), -1*(pot_val >> 2));
 			
 			/*motors_set_omega(-5.0, -5.0);*/
 			
-			mcontrol_set(-0.5, 0.0);
+			/*motors_set_omega(-setval, -setval);*/
+			
+			/*mcontrol_set(-setval, 0.0);*/
 			
 			break;
 		}

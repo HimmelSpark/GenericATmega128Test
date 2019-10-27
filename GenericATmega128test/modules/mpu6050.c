@@ -25,6 +25,8 @@ static int16_t	mpu6050_accelX	= 0,
 		
 uint8_t __gyro_calib = 0;	// выставлены ли нули на гироскопах?
 
+uint8_t __gyro_init_count = 0;	// это нужно для двухкратной инициализации MPU6050
+
 /* Область переменных из модуля i2c.c */
 extern uint8_t i2c_write_buffer[I2C_MAX_WRITE_BYTES_COUNT];
 extern uint8_t i2c_read_buffer[I2C_MAX_READ_BYTES_COUNT];
@@ -36,9 +38,9 @@ inline void mpu6050_init (void)
 	MPU6050_AD0_DDR |= (1 << MPU6050_AD0);	// выход
 	
 	#if MPU6050_ADDR_LSB == 0
-	MPU6050_AD0_PORT &= ~(1 << MPU6050_AD0);// '0'
+		MPU6050_AD0_PORT &= ~(1 << MPU6050_AD0);// '0'
 	#elif MPU6050_ADDR_LSB == 1
-	MPU6050_AD0_PORT |= (1 << MPU6050_AD0);	// '1'
+		MPU6050_AD0_PORT |= (1 << MPU6050_AD0);	// '1'
 	#endif
 	
 	mpu6050_init_set ();
@@ -82,13 +84,22 @@ void mpu6050_poweron (void)
 	{
 		rtos_set_task (mpu6050_poweron, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
 	}
+	__gyro_init_count++;
 	
 	return;
 }
 
 void poweron_exit (void)
 {
-	rtos_set_task (mpu6050_read, MPU6050_READ_STARTUP_DELAY, MPU6050_READ_PERIOD);	// теперь готовы читать данные
+	// Это костыль
+	if (__gyro_init_count == 1)
+	{
+		rtos_set_task(mpu6050_init_set, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
+	}
+	else if (__gyro_init_count == 2)
+	{
+		rtos_set_task (mpu6050_read, MPU6050_READ_STARTUP_DELAY, MPU6050_READ_PERIOD);	// теперь готовы читать данные
+	}
 	
 	return;
 }

@@ -26,18 +26,33 @@ void fifo_push (uint8_t c, FIFO_BUFFER_t* buf_p)
 	{
 		buf_p->idxIn = 0;
 	}
-	// ToDo: обработка заполнени€ буфера ("наезда" на непереданные байты)
 	return;
 }
 
 uint8_t fifo_pop (FIFO_BUFFER_t *buf_p)
 {
-	uint8_t retval = buf_p->buffer[buf_p->idxOut++];
-	if (buf_p->idxOut >= buf_p->size)
+	uint8_t retval;
+
+	if(fifo_pop_avail(buf_p))					// ≈сли есть чего доставать, 
 	{
-		buf_p->idxOut = 0;	
+		retval = buf_p->buffer[buf_p->idxOut++];// достаЄм
+		if (buf_p->idxOut >= buf_p->size)
+		{
+			buf_p->idxOut = 0;
+		}
 	}
+	else										// ≈сли доставать нечего,
+	{
+		retval = FIFO_NULL;						// возвращаем NULL и больше ничего не делаем
+	}
+	
 	return retval;
+}
+
+inline uint8_t fifo_pop_avail(FIFO_BUFFER_t *buf_p)
+{
+	// ≈сли можем достать элемент, то возвращаем 1; в противном случае 0;
+	return (buf_p->idxIn != buf_p->idxOut) ? 1 : 0;
 }
 
 void fifo_flush (FIFO_BUFFER_t *buf_p)

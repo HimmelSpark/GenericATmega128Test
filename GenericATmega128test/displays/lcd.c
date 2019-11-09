@@ -98,7 +98,7 @@ void __lcd_tx_routine (void)
 	__LCD_DB_HiZ;
 	
 	// Если ещё осталось что-то для записи, планируем эту процедуру ещё раз:
-	if (__lcd_data_buf.idxIn != __lcd_data_buf.idxOut)
+	if (fifo_pop_avail(&__lcd_data_buf))
 	{
 		rtos_set_task (__lcd_tx_routine, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
 	}
@@ -298,8 +298,6 @@ int lcd_stdputc (char c, FILE *stream)
 inline void lcd_putc (char c)
 {
 	lcd_stdputc (c, NULL);
-	
-	return;
 }
 
 

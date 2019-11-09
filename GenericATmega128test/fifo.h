@@ -22,9 +22,12 @@ typedef struct
 void fifo_init (FIFO_BUFFER_t *buf_p, uint16_t size);	// инициализация, выделение памяти
 void fifo_push (uint8_t c, FIFO_BUFFER_t* buf_p);		// кладём байт
 uint8_t fifo_pop (FIFO_BUFFER_t *buf_p);				// достаём байт
-void fifo_flush (FIFO_BUFFER_t *buf_p);					// очистка буфера
+uint8_t fifo_pop_avail(FIFO_BUFFER_t *buf_p);			// можно ли считать
+void fifo_flush (FIFO_BUFFER_t *buf_p);					// сброс буфера
 
 // buf_p ~ buffer pointer
+
+#define FIFO_NULL	0
 
 
 

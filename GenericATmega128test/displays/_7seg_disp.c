@@ -27,8 +27,6 @@ inline void _7seg_init (void)
 	_7seg_hiZ_all ();
 //	rtos_set_task (_7seg_redraw, RTOS_RUN_ASAP, _7SEG_REDRAW_PERIOD);
 	_7seg_puts ("hola\n");
-	
-	return;
 }
 
 inline void _7seg_hiZ_all (void)
@@ -37,22 +35,17 @@ inline void _7seg_hiZ_all (void)
 	SEGPORT = 0x00;
 	POSDDR &= 0x0F; // гасим пины 7, 6, 5, 4
 	POSPORT &= 0x0F;
-	
-	return;
 }
 
 inline void _7seg_set_seg (uint8_t seg)
 {
 	SEGPORT |= 1 << seg;
 	SEGDDR |= 1 << seg;
-	
-	return;
 }
 
 inline void _7seg_set_pos (uint8_t pos)
 {
 	POSDDR |= 1 << (pos);
-	return;
 }
 
 inline void _7seg_clear_buff (void)
@@ -62,8 +55,6 @@ inline void _7seg_clear_buff (void)
 	{
 		buff[i] = 0x00;
 	}
-
-	return;
 }
 
 inline void _7seg_disp_char_from_charset (uint8_t pos, uint8_t index)
@@ -71,8 +62,6 @@ inline void _7seg_disp_char_from_charset (uint8_t pos, uint8_t index)
 	_7seg_hiZ_all ();
 	_7seg_set_pos (pos + POS_OFFSET);
 	SEGDDR = SEGPORT = charset[index];
-	
-	return;
 }
 
 void _7seg_redraw (void)
@@ -98,8 +87,6 @@ inline void _7seg_disp_char_from_buff (uint8_t pos)
 	{
 		_7seg_set_seg (segDL); // (на 0 позиции не окажет влияния)
 	}
-	
-	return;
 }
 
 int _7seg_stdputc (char c, FILE *stream)
@@ -186,7 +173,6 @@ int _7seg_stdputc (char c, FILE *stream)
 inline void _7seg_putc (char c)
 {
 	_7seg_stdputc (c, NULL);
-	return;
 }
 
 inline void _7seg_puts (char *str)
@@ -197,6 +183,4 @@ inline void _7seg_puts (char *str)
 	{
 		_7seg_putc (c);
 	}
-	
-	return;
 }

@@ -24,6 +24,9 @@ uint8_t __uart_ready = 0;		// если UART не инициализирован, передача байтов буде
 
  void uart_init (void)
 {
+	// Инициализируем кольцевой FIFO-буфер
+	fifo_init (&__uart_tx_buf, UART_TX_BUF_SIZE);
+	
 	UBRR0L = (uint8_t) UART_UBRR;
 	UBRR0H = (uint8_t) (UART_UBRR >> 8);
 	UCSR0C |= (1 << UCSZ01) | (1 << UCSZ00); // Char size 8 bit
@@ -31,15 +34,10 @@ uint8_t __uart_ready = 0;		// если UART не инициализирован, передача байтов буде
 				(UART_RXC_INT_ENABLE << RXCIE0);
 				
 	__uart_ready = 1;
-				
-	// Инициализируем кольцевой FIFO-буфер
-	fifo_init (&__uart_tx_buf, UART_TX_BUF_SIZE);
 	
 	uart_clrscr ();
 	uart_home ();
 	uart_puts ("[ OK ] UART Alive\n");
-	
-//	uart_puts("AT+B9600");
 	
 	return;
 }
@@ -70,7 +68,6 @@ int uart_stdputc (char c, FILE *stream)
 inline void uart_putc (char c)
 {
 	uart_stdputc (c, NULL);
-	return;
 }
 
 void uart_puts (char *str)
@@ -102,7 +99,6 @@ void uart_home (void)
 inline void uart_goto_xy (int x, int y)
 {
 	printf (UART_ESC "[%d;%dH", y, x);
-	return;
 }
 
 void uart_reset_disp_attr (void)
@@ -115,22 +111,20 @@ void uart_reset_disp_attr (void)
 inline void uart_set_disp_attr (int attr)
 {
 	printf (UART_ESC "[%dm", attr);
-	return;
 }
 
 inline void __uart_tx_routine (void)
-{	// Вызов по прерыванию
-	// UDR готов, пишем в него из буфера:
+{// ISR
+	// UDR готов, пишем в него из буфера (в нём заведомо что-то есть):
 	UDR0 = fifo_pop (&__uart_tx_buf);
-	// Нотация точечная, т.к. работаем с буфером напрямую, а не через указатель:
-	if (__uart_tx_buf.idxOut == __uart_tx_buf.idxIn)
+	if (!fifo_pop_avail(&__uart_tx_buf))
 	{	// если на данный момент передать больше нечего,
 		UCSR0B &= ~(1 << UDRIE0);	// отключаем данное прерывание
 	}
 }
 
 inline void __uart_rx_byte (void)
-{	// Вызов по прерыванию
+{// ISR
 	// Пока что примитивная система команд
 	uint8_t buff = UDR0;
 	
@@ -252,6 +246,4 @@ inline void __uart_rx_byte (void)
 			break;
 		}
 	} 
-		
-	return;
 }

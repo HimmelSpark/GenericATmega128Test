@@ -13,6 +13,8 @@ Project("{54F91283-7BC4-4236-8FF9-10F437C3AD48}") = "UARTtest", "UARTtest\UARTte
 EndProject
 Project("{54F91283-7BC4-4236-8FF9-10F437C3AD48}") = "UART_FIFO", "UART_FIFO\UART_FIFO.cproj", "{AC2084DF-4744-4181-86A9-A88FF6449F14}"
 EndProject
+Project("{54F91283-7BC4-4236-8FF9-10F437C3AD48}") = "INStest", "INStest\INStest.cproj", "{74F2A727-E9EB-4C35-994B-E9004B5AF6E4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|AVR = Debug|AVR
@@ -39,6 +41,10 @@ Global
 		{AC2084DF-4744-4181-86A9-A88FF6449F14}.Debug|AVR.Build.0 = Debug|AVR
 		{AC2084DF-4744-4181-86A9-A88FF6449F14}.Release|AVR.ActiveCfg = Release|AVR
 		{AC2084DF-4744-4181-86A9-A88FF6449F14}.Release|AVR.Build.0 = Release|AVR
+		{74F2A727-E9EB-4C35-994B-E9004B5AF6E4}.Debug|AVR.ActiveCfg = Debug|AVR
+		{74F2A727-E9EB-4C35-994B-E9004B5AF6E4}.Debug|AVR.Build.0 = Debug|AVR
+		{74F2A727-E9EB-4C35-994B-E9004B5AF6E4}.Release|AVR.ActiveCfg = Release|AVR
+		{74F2A727-E9EB-4C35-994B-E9004B5AF6E4}.Release|AVR.Build.0 = Release|AVR
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

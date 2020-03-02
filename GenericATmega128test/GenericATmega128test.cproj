@@ -122,6 +122,7 @@
         <avrgcc.compiler.optimization.DebugLevel>Default (-g2)</avrgcc.compiler.optimization.DebugLevel>
         <avrgcc.compiler.warnings.AllWarnings>True</avrgcc.compiler.warnings.AllWarnings>
         <avrgcc.compiler.warnings.ExtraWarnings>True</avrgcc.compiler.warnings.ExtraWarnings>
+        <avrgcc.compiler.miscellaneous.OtherFlags>-std=gnu99 -Wno-comment</avrgcc.compiler.miscellaneous.OtherFlags>
         <avrgcc.compiler.miscellaneous.Verbose>True</avrgcc.compiler.miscellaneous.Verbose>
         <avrgcc.linker.general.UseVprintfLibrary>True</avrgcc.linker.general.UseVprintfLibrary>
         <avrgcc.linker.libraries.Libraries>
@@ -185,6 +186,18 @@
     <Compile Include="modules\bmp180.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="modules\gps.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="modules\gps.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="modules\hmc5883l.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="modules\hmc5883l.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="modules\md3.c">
       <SubType>compile</SubType>
     </Compile>
@@ -207,6 +220,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="motion_control.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="nav.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="nav.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="rtos.c">

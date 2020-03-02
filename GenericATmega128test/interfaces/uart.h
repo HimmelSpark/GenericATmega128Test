@@ -90,5 +90,7 @@ void __uart_rx_byte (void);			// обработчик прерывания дл�
 #define B_CYAN		46
 #define B_WHITE		47
 
+#define UART_ALARM	uart_putc('\a')
+
 
 #endif /* UART_H_ */

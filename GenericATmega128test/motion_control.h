@@ -16,11 +16,12 @@ typedef struct {
 
 /* Пользовательские функции */
 
-void mcontrol_init (void);							// инициализация управления движением
-void mcontrol_set (float lin_vel, float ang_vel);	// задаём скорость движения и поворота платформы
-void mcontrol_course_reset (void);					// сброс интегратора угловой скорости
+void mcontrol_init (void);								// инициализация управления движением
+void mcontrol_set (float lin_vel, float ang_vel);		// задаём уставки скорости движения и поворота платформы
+void mcontrol_get_obj(float *lin_vel, float *ang_vel);	// возвращаем уставки скорости движения и поворота платформы
+//void mcontrol_course_reset (void);						// сброс интегратора угловой скорости
 MOTION_PARAMS mcontrol_get_mparams (void);			// получить расчётные  параметры движения
-													// (линейную и угловую скорости)
+														// (линейную и угловую скорости)
 /****************************/
 
 
@@ -41,8 +42,8 @@ void __motion_controller (void);	// регулятор верхнего уровня; устанавливает ско
 #define MCONTROL_B			0.2100	// м; расстояние между ведущими колёсами
 
 #define MCONTROL_PI_Kp		4.0							// параметры
-#define MCONTROL_PI_Ki		12.0						// ПИ-
-#define MCONTROL_PI_dT		(MCONTROL_PERIOD/1000.0)	// регулятора
+#define MCONTROL_PI_Ki		7.0 						// ПИ-
+#define MCONTROL_PI_dT		(MCONTROL_PERIOD/1000.0)	// регулятора по угловой скорости поворота
 
 
 #define MCONTROL_LIN_VEL_MIN			0.13		// м/с; меньшие скорости не обеспечим

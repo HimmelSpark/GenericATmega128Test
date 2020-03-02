@@ -59,7 +59,6 @@ void mcontrol_set (float lin_vel, float ang_vel)
 	}
 	
 	// ”становка угловой скорости (поворота)
-	
 	if (ang_vel > MCONTROL_ANG_VEL_CONSTR_MAX)
 	{
 		__motion_params.ang_vel = MCONTROL_ANG_VEL_CONSTR_MAX;
@@ -76,13 +75,18 @@ void mcontrol_set (float lin_vel, float ang_vel)
 	return;
 }
 
-void mcontrol_course_reset(void)
+void mcontrol_get_obj(float *lin_vel, float *ang_vel)
 {
-	__mcontroller_crs_rst = 1;
-	uart_puts("[ OK ] MCONTR course reset\n");
+	*lin_vel = __motion_params.lin_vel;
+	*ang_vel = __motion_params.ang_vel;
 	
 	return;
 }
+
+// inline void mcontrol_course_reset(void)
+// {
+// 	__mcontroller_reset = 1;
+// }
 
 MOTION_PARAMS mcontrol_get_mparams (void)
 {	// ќжидаемые скорости (на основе скоростей вращени€ двигателей)
@@ -101,29 +105,23 @@ void __motion_controller (void)
 	MPU6050_GYRO_DATA gyro;
 	double omega1_obj, omega2_obj;
 	
-	static double I = 0.0, domega = 0.0;
+	static double	I = 0.0,
+					domega = 0.0;
 	double eps = 0.0;
 	
 	if (__mcontroller_reset)
 	{
 		I = 0.0;
-		
 		__mcontroller_reset = 0;
-		uart_puts ("[ OK ] Motion controller engaged\n");
-	}
-	
-	if (__mcontroller_crs_rst)
-	{	// ѕри установке этого флага принимаем текущее направление в качестве заданного
-		I = 0.0;
 		
-		__mcontroller_crs_rst = 0;
+		uart_puts ("[ OK ] MCONTR reset\n");
 	}
 	
 	if (__motion_params.lin_vel != 0.0)
 	{
 		gyro = mpu6050_get_gyro ();
 		
-//		gyro.gZ = 0.0;	// только дл€ отладки
+//		gyro.gZ = __motion_params.ang_vel;	// только дл€ отладки
 		
 		// «адаЄм движение с заданной линейной скоростью:
 		omega1_obj = omega2_obj = __motion_params.lin_vel / MCONTROL_R;
@@ -148,7 +146,7 @@ void __motion_controller (void)
 										// остановитс€ (это обеспечиваетс€ ѕ»-регул€тором)
 		rtos_delete_task (__motion_controller);
 		__mcontroller_reset = 1;
-		uart_puts ("[ OK ] Motion controller disengaged\n");
+		uart_puts ("[ OK ] MCONTR disengaged\n");
 	}
 	
 	motors_set_omega (omega1_obj, omega2_obj);

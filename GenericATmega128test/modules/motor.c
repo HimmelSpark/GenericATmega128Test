@@ -41,8 +41,6 @@ uint8_t __motors_disarm_armed = 0;		// флаг подготовки отклю�
 
 volatile uint8_t __enc_L_en = 1, __enc_R_en = 1;	// флаги разрешения чтения энкодеров
 
-__debug_picontr_data picontr;
-
 inline void __enc_L (void)
 {// ISR
 	// Данное прерывание "будит" оцениватель скорости, если он ещё не работает
@@ -54,7 +52,7 @@ inline void __enc_L (void)
 	
 	if (__enc_L_en)
 	{
-		__DEBUG_PIN_SWITCH;
+//		__DEBUG_PIN_SWITCH;
 		__enc_L_en = 0;
 		
 		// Определяем направление движения (см. осцилограммы)
@@ -214,21 +212,21 @@ void __motors_set_thrust (int16_t thrust_L, int16_t thrust_R)
 	}
 	
 	
-// 	if (__motor_L_reached_constr || __motor_R_reached_constr)
-// 	{	// Если достигнут максимум хотя бы одним двигателем
-// 		if (!__motors_disarm_armed)
-// 		{	// И ещё не подготовили отключение двигателей,
-// 			rtos_set_task (motors_disarm, 1000, RTOS_RUN_ONCE);	// делаем это сейчас
-// 			__motors_disarm_armed = 1;							// подготовили
-// 			uart_puts ("[ ! ] One of motors exceeded constraint. Motors will be disarmed in 1 s\n");
-// 		}
-// 	}
-// 	else if (__motors_disarm_armed)
-// 	{	// Если не превышаем ограничения, а отключение подготовлено, то отменяем его
-// 		rtos_delete_task (motors_disarm);
-// 		__motors_disarm_armed = 0;
-// 		uart_puts ("[ ! ] Motors disarm cancelled\n");
-// 	}
+	if (__motor_L_reached_constr || __motor_R_reached_constr)
+	{	// Если достигнут максимум хотя бы одним двигателем
+		if (!__motors_disarm_armed)
+		{	// И ещё не подготовили отключение двигателей,
+			rtos_set_task (motors_disarm, 1000, RTOS_RUN_ONCE);	// делаем это сейчас
+			__motors_disarm_armed = 1;							// подготовили
+//			uart_puts ("[ ! ] Constraint exceeded\n");
+		}
+	}
+	else if (__motors_disarm_armed)
+	{	// Если не превышаем ограничения, а отключение подготовлено, то отменяем его
+		rtos_delete_task (motors_disarm);
+		__motors_disarm_armed = 0;
+//		uart_puts ("[ OK ] Motors disarm cancelled\n");
+	}
 	
 	
 	return;
@@ -308,15 +306,15 @@ void __motors_omega_estimator (void)
 			rtos_set_task (__motors_omega_estimator_diseng, ESTIM_DISENG_DELAY, RTOS_RUN_ONCE);
 			__estimator_diseng_armed = 1;
 			
-			uart_puts ("[ ! ]	Estimator is being disengaged if raw omega\n");
-			uart_puts ("	doesn't exceed 10 pulses/s during next 2 s\n");
+// 			uart_puts ("[ ! ]	Estimator is being disengaged if raw omega\n");
+// 			uart_puts ("	doesn't exceed 10 pulses/s during next 2 s\n");
 		}
 	}
 	else if (__estimator_diseng_armed)
 	{	// Если продолжаем ехать, а отключение оценивателя подготовлено, то отменим это
 		rtos_delete_task (__motors_omega_estimator_diseng);
 		__estimator_diseng_armed = 0;
-		uart_puts ("[ ! ] Estimator disangage cancelled\n");
+//		uart_puts ("[ ! ] Estimator disangage cancelled\n");
 	}
 	
 	// Атомарно вычислим сигналы ошибок, т.к. импульсы меняются в прерываниях
@@ -500,13 +498,6 @@ void __motors_pi_controller (void)
 	
 	__motors_set_thrust (u_L, u_R);
 	
-	picontr.eps_L = eps_L;
-	picontr.eps_R = eps_R;
-	picontr.I_L = I_L;
-	picontr.I_R = I_R;
-	picontr.u_L = u_L;
-	picontr.u_R = u_R;
-	
 	return;
 }
 
@@ -527,7 +518,9 @@ inline void motors_init (void)
 	/* Настройка прерываний энкодеров (rising edge INT6,7) */
 	EICRB |= (1 << ISC51) | (1 << ISC50) | (1 << ISC41) | (1 << ISC40);
 	
-	rtos_set_task (motors_arm, MOTORS_STARTUP_TIME, RTOS_RUN_ONCE);
+	#if MOTORS_ARM_ON_STARTUP == 1
+		rtos_set_task (motors_arm, MOTORS_STARTUP_TIME, RTOS_RUN_ONCE);
+	#endif
 	
 	uart_puts ("[ OK ] Motors init completed\n");
 	

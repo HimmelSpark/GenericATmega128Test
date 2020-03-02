@@ -4,6 +4,7 @@ LCDmyTest/Debug/
 NewRTOS/Debug/
 UART_FIFO/Debug/
 UARTtest/Debug/
+INStest/Debug/
 
 *.atsuo
 *.d
@@ -14,3 +15,4 @@ UARTtest/Debug/
 *.lss
 *.map
 *.srec
+*.zip

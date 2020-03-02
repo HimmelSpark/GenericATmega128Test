@@ -15,8 +15,8 @@
 Двигатель L: PB6, OC1B;
 Двигатель R: PB7, OC1C
 
-Энкодер L: PD2, INT2 (запасной PE4/INT4 с диодом)
-Энкодер R: PD3, INT3 (запасной PE5/INT5 с диодом)
+Энкодер L: 
+Энкодер R: 
 
 */
 
@@ -50,7 +50,7 @@ void __motors_omega_estimator (void);			// оценка производной �
 void __motors_omega_estimator_diseng (void);	// отключить оцениватель (для отложенного отключения)
 void __motors_pi_controller (void);				// ПИ-регулятор
 
-//void step_test (void);					// снятие ступенчатой характеристики (отладка)
+//void step_test (void);					// снятие переходной характеристики (отладка)
 
 /*********************/
 
@@ -121,12 +121,13 @@ void motors_set_omega (double omega_L, double omega_R); // Задать уста
 // #define MOTORS_ENC_R_ENABLE			1
 
 
+#define MOTORS_ARM_ON_STARTUP		0
 #define MOTORS_STARTUP_TIME			1000	// ms
 
 #define ENC_FILTER_TIME				500		// us; для фильтра ложных прерываний
 
 #define MOTORS_PWM_TRS				50		// экспериментально установленный порог страгивания
-#define MOTORS_PWM_CONSTR_MAX		200		// ограничение сверху
+#define MOTORS_PWM_CONSTR_MAX		250		// ограничение сверху
 
 #define MOTORS_THRUST_POS			1
 #define MOTORS_THRUST_NEG			(-1)
@@ -165,8 +166,8 @@ void motors_set_omega (double omega_L, double omega_R); // Задать уста
 
 #define PICONTR_PERIOD		10			// ms
 #define PICONTR_CONST_dT	0.01		// s
-#define PICONTR_CONST_Kp	5.0
-#define PICONTR_CONST_Ki	3.0
+#define PICONTR_CONST_Kp	4.0
+#define PICONTR_CONST_Ki	6.0
 
 #define MOTORS_OMEGA_OBJ_MAX		40.0	// рад/с; максимальная уставка
 #define MOTORS_OMEGA_OBJ_MIN		1.0		// рад/с; меньшие скорости не гарантируем

@@ -1,10 +1,10 @@
 .vs/
 GenericATmega128test/Debug/
-LCDmyTest/Debug/
-NewRTOS/Debug/
-UART_FIFO/Debug/
-UARTtest/Debug/
-INStest/Debug/
+LCDmyTest/
+NewRTOS/
+UART_FIFO/
+UARTtest/
+INStest/
 
 *.atsuo
 *.d

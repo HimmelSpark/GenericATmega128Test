@@ -35,8 +35,7 @@ I2C_EXIT_F i2c_exit_func = i2c_exit_func_idle;	// по умолчанию пос
 
 inline void i2c_init (void)
 {
-	// Пины I2C должны быть hi-Z; хотя это происходит по умолчанию после включения,
-	// на всякий случай гасим их руками:
+	// Пины I2C должны быть hi-Z
 	I2C_PORT_DDR &= ~((1 << I2C_SCL_PIN) | (1 << I2C_SDA_PIN));
 	I2C_PORT &= ~((1 << I2C_SCL_PIN) | (1 << I2C_SDA_PIN));
 	

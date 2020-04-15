@@ -272,7 +272,7 @@ inline void __uart_rx_byte (void)
 				dbg = 1;
 				uart_clrscr ();
 				uart_home ();
-				uart_puts ("~~~~~DEBUG MODE BEGIN~~~~~\nGyro Noise\n[every 0.025 second]\n\n");
+				uart_puts ("[ OK ] Debug mode begin\n");
 //				uart_puts ("obj_L omega_L eps_L I_L u_L obj_R omega_R eps_R I_R u_R\nevery 0.3 s\n");
 //				uart_puts ("eng1 [rad/s]|eng2 [rad/s]  |  gZ [deg/s] |  Vel [m/s]\n\nEvery 0.3 s\n\n");
 //				uart_puts("POW_L\tOMEGA_L\t\tPOW_R\tOMEGA_R\n\n");
@@ -280,15 +280,15 @@ inline void __uart_rx_byte (void)
 //				uart_puts("STEP-TEST BEGIN: Omega_obj = 15 deg/s, dt = 0.1 s\n\n");
 //				uart_puts("STEP-TEST BEGIN: lin_vel_obj = 1.0, dt = 0.1 s\n\n");
 //				uart_puts("gX\tint(gX)\t\tgY\tint(gY)\t\tgZ\tint(gZ)\n");
-				uart_puts("degrees\ngZ\tint(gZ)\n");
-				rtos_set_task (show_info_uart, 1000, 25);
+//				uart_puts("degrees\ngZ\tint(gZ)\n");
+				rtos_set_task (show_info_uart, 1000, 300);
 //				mcontrol_set(0.8, 15*3.14/180.0);
 //				mcontrol_set(1.0, 0.0);
 			}
 			else
 			{
 				dbg = 0;
-				uart_puts ("~~~DEBUG MODE END~~~\n");
+				uart_puts ("[ OK ] Debug mode end\n");
 				rtos_delete_task (show_info_uart);
 				
 //				mcontrol_set(0.0, 0.0);

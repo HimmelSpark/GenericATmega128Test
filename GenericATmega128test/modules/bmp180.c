@@ -42,7 +42,7 @@ double C1 = 44330.0, C2 = 0.19029, C3 = 4945.0;
 // Точное значение C2: 0.19029495718363463368220742150333
 
 
-inline void bmp180_init (void)
+void bmp180_init (void)
 {
 	int res = i2c_read_bytes (BMP180_ADDR, BMP180_AC1_ADDR_HI, BMP180_CAL_BYTES_COUNT, read_params_exit);
 	if (res)

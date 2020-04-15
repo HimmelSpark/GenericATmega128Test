@@ -23,9 +23,9 @@ static int16_t	mpu6050_accelX	= 0,
 				mpu6050_gyroY	= 0,	mpu6050_gyroY_offset = 0,
 				mpu6050_gyroZ	= 0,	mpu6050_gyroZ_offset = 0;
 		
-uint8_t __gyro_calib = 0;	// выставлены ли нули на гироскопах?
+uint8_t __gyro_calib = 1;		// выставлены ли нули на гироскопах?
 
-uint8_t __gyro_init_count = 0;	// это нужно для двухкратной инициализации MPU6050
+uint8_t __gyro_init_count = 0;	// это нужно для двухкратной инициализации MPU6050 (костыль)
 
 /* Область переменных из модуля i2c.c */
 extern uint8_t i2c_write_buffer[I2C_MAX_WRITE_BYTES_COUNT];
@@ -33,8 +33,9 @@ extern uint8_t i2c_read_buffer[I2C_MAX_READ_BYTES_COUNT];
 extern uint8_t i2c_status;
 /**************************************/
 
-inline void mpu6050_init (void)
+void mpu6050_init (void)
 {
+	// Настройка адреса установкой адресного пина
 	MPU6050_AD0_DDR |= (1 << MPU6050_AD0);	// выход
 	
 	#if MPU6050_ADDR_LSB == 0
@@ -65,12 +66,12 @@ void mpu6050_init_set (void)
 	i2c_write_buffer[1] = config;
 	i2c_write_buffer[2] = gyro_config;
 	i2c_write_buffer[3] = accel_config;
-	i2c_write_from_buffer (mpu6050_addr, MPU6050_SMPLRT_DIV, bytes_count, init_set_exit);
+	i2c_write_from_buffer (mpu6050_addr, MPU6050_SMPLRT_DIV, bytes_count, mpu6050_init_set_exit);
 	
 	return;
 }
 
-void init_set_exit (void)
+void mpu6050_init_set_exit (void)
 {
 	rtos_set_task (mpu6050_poweron, MPU6050_STARTUP_DELAY, RTOS_RUN_ONCE);
 	return;
@@ -79,7 +80,7 @@ void init_set_exit (void)
 void mpu6050_poweron (void)
 {
 	uint8_t pwr_mgmt1 = 0x00;	// выходим из sleep + не используем cycle, temp_dis и clksel
-	uint8_t res = i2c_write_byte2reg (mpu6050_addr, MPU6050_PWR_MGMT1, pwr_mgmt1, poweron_exit);
+	uint8_t res = i2c_write_byte2reg (mpu6050_addr, MPU6050_PWR_MGMT1, pwr_mgmt1, mpu6050_poweron_exit);
 	if (res)
 	{
 		rtos_set_task (mpu6050_poweron, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
@@ -89,7 +90,7 @@ void mpu6050_poweron (void)
 	return;
 }
 
-void poweron_exit (void)
+void mpu6050_poweron_exit (void)
 {
 	// Это костыль
 	if (__gyro_init_count == 1)
@@ -106,7 +107,7 @@ void poweron_exit (void)
 
 void mpu6050_read (void)
 {
-	uint8_t res = i2c_read_bytes (mpu6050_addr, MPU6050_ACCEL_XOUT_H, MPU6050_DATA_BLOCK, read_exit);
+	uint8_t res = i2c_read_bytes (mpu6050_addr, MPU6050_ACCEL_XOUT_H, MPU6050_DATA_BYTES_COUNT, mpu6050_read_exit);
 	if (res)
 	{
 		rtos_set_task (mpu6050_read, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
@@ -115,7 +116,7 @@ void mpu6050_read (void)
 	return;
 }
 
-void read_exit (void)
+void mpu6050_read_exit(void)
 {
 	mpu6050_accelX	= (i2c_read_buffer[0]  << 8)| i2c_read_buffer[1];
 	mpu6050_accelY	= (i2c_read_buffer[2]  << 8)| i2c_read_buffer[3];
@@ -154,6 +155,7 @@ MPU6050_ACCEL_DATA mpu6050_get_accel (void)
 MPU6050_GYRO_DATA mpu6050_get_gyro (void)
 {
 	MPU6050_GYRO_DATA gyro_data;
+
 	gyro_data.gX = ((double)mpu6050_gyroX)/MPU6050_GYRO_SCALE;
 	gyro_data.gY = ((double)mpu6050_gyroY)/MPU6050_GYRO_SCALE;
 	gyro_data.gZ = ((double)mpu6050_gyroZ)/MPU6050_GYRO_SCALE;

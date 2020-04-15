@@ -17,6 +17,7 @@
 #include "modules/md3.h"
 #include "modules/bmp180.h"
 #include "modules/mpu6050.h"
+#include "modules/hmc5883l.h"
 #include "modules/motor.h"
 #include "modules/gps.h"
 #include "nav.h"
@@ -115,11 +116,11 @@ int main (void)
 	md3_init ();
 	uart_init ();
 	i2c_init ();
-//	lcd_init ();
+	lcd_init ();
 	_7seg_init ();
 	motors_init ();
-//	mcontrol_init ();
-//	nav_init();
+	mcontrol_init ();
+	nav_init();
 	
 // Выбор стандартного вывода:
 //	stdout = &_7SEG_;
@@ -127,13 +128,14 @@ int main (void)
  	stdout = &__UART__;
 	
 	rtos_set_task (show_info_7seg, 1000, 200);
-// 	rtos_set_task (show_info_lcd, 1010, 200);
-// 	rtos_set_task (show_info_uart, 1050, 100);
+ 	rtos_set_task (show_info_lcd, 1010, 200);
+// 	rtos_set_task (show_info_uart, 1050, 300);
 	
 // 	rtos_set_task (bmp180_init, 1, RTOS_RUN_ONCE);
- 	rtos_set_task (mpu6050_init, 1, RTOS_RUN_ONCE);
+// 	rtos_set_task (mpu6050_init, 1, RTOS_RUN_ONCE);
+	rtos_set_task (hmc5883l_init, 1, RTOS_RUN_ONCE);
 	 
-//	rtos_set_task(gps_init, 1000, RTOS_RUN_ONCE);
+	rtos_set_task(gps_init, 1000, RTOS_RUN_ONCE);
 	
 	sei ();
 
@@ -159,20 +161,20 @@ void show_info_uart (void)
 	
 //	stdout = &_UART_;
 	
-// 	uart_clrscr ();
-// 	uart_home ();
+//	uart_clrscr ();
+	uart_home ();
 
-// 	GPS_POS gps_pos;
-// 	GPS_MOTION gps_motion;
-// 	GPS_INF gps_info;
-// 	GPS_DATE gps_date;
-// 	GPS_TIME gps_time;
-// 	
-// 	gps_get_pos(&gps_pos);
-// 	gps_get_motion(&gps_motion);
-// 	gps_get_info(&gps_info);
-// 	gps_get_date(&gps_date);
-// 	gps_get_time(&gps_time);
+	GPS_POS gps_pos;
+	GPS_MOTION gps_motion;
+	GPS_INF gps_info;
+	GPS_DATE gps_date;
+	GPS_TIME gps_time;
+	
+	gps_get_pos(&gps_pos);
+	gps_get_motion(&gps_motion);
+	gps_get_info(&gps_info);
+	gps_get_date(&gps_date);
+	gps_get_time(&gps_time);
 
 // 	float lat_ref, lon_ref;
 // 	nav_get_tgt_wp(&lat_ref, &lon_ref);
@@ -182,7 +184,7 @@ void show_info_uart (void)
 
 // 	NAV_ROUTE_PROGRESS progress;
 // 	nav_route_get_progress(&progress);
-// 	
+
 // 	float lin_vel_obj, ang_vel_obj;
 // 	mcontrol_get_obj(&lin_vel_obj, &ang_vel_obj);
 	
@@ -192,12 +194,22 @@ void show_info_uart (void)
 // 	MPU6050_ACCEL_DATA accel = mpu6050_get_accel ();
  	MPU6050_GYRO_DATA gyro = mpu6050_get_gyro ();
 //	static float phi_x = 0.0, phi_y = 0.0, phi_z = 0.0;
-	static float  phi_z = 0.0;
+//	static float  phi_z = 0.0;
+
+// 	HMC5883L_MAG_DATA mag;
+// 	hmc5883l_get_mag(&mag);
+
+	HMC5883L_RAW_DATA hmc5883l_raw;
+	hmc5883l_get_raw(&hmc5883l_raw);
+	
+	HMC5883L_DEBUG hmc5883l_debug;
+	hmc5883l_get_debug(&hmc5883l_debug);
+
 //	MOTION_PARAMS motion = mcontrol_get_mparams ();
 
-// 	MOTOR_OMEGA_DATA	omega		= motors_get_omega ();
+//	MOTOR_OMEGA_DATA	omega		= motors_get_omega ();
 // 						omega_obj	= motors_get_omega_obj ();
-// 						
+ 						
 //	MOTOR_POWER_DATA power = motors_get_power ();
 	
 //	extern __debug_picontr_data picontr;
@@ -235,7 +247,7 @@ void show_info_uart (void)
 				omega_obj.omegaL, omega_obj.omegaR, mpu6050_gyro.gZ, motion.lin_vel);
 				
 // 	fprintf(&__UART__,
-// 		"%02d-%02d-%02d\t%02d:%02d:%02d UTC\nLat %02.5f\tLon %03.5f\tAlt %03.1f\tVel %02.1f\tCrs %03.1f\nSats %d\tHDOP %02.1f\n\n",
+// 		"%02d-%02d-%02d\t%02d:%02d:%02d UTC\nLat %02.5f\tLon %03.5f\tAlt %03.1f\tVel %02.1f\tCrs %03.1f\nSats %2d\tHDOP %02.1f\n\n",
 // 		gps_date.dd, gps_date.mm, gps_date.yy, gps_time.hh, gps_time.mm, gps_time.ss,
 // 		gps_pos.lat, gps_pos.lon, gps_pos.alt, gps_motion.vel, gps_motion.crs,
 // 		gps_info.sats_num, gps_info.hdop);
@@ -262,15 +274,28 @@ void show_info_uart (void)
 // 		(int)(gyro.gZ*180/3.14),
 // 		(uint8_t)power.powL, omega.omegaL, (uint8_t)power.powR, omega.omegaR,
 // 		md3_get_voltage());
+		
+	fprintf(&__UART__,
+		"\nGPS:\n\tLAT %8.5f\tLON %8.5f\tVEL %05.2f\tCRS %03d\t\tSATS %2d\t\tHDOP %4.1f\nGYROS:\n\tz %4d\nMAG (raw):\n\tx %5d\t\ty %5d\t\tz %5d\n\nVOLT: %5.2f\n\n",
+		gps_pos.lat, gps_pos.lon, gps_motion.vel*0.5144, gps_motion.crs,
+		gps_info.sats_num, gps_info.hdop,
+		(int)(gyro.gZ*180/3.14),
+		hmc5883l_raw.mX_raw, hmc5883l_raw.mY_raw, hmc5883l_raw.mZ_raw,
+		md3_get_voltage());
+		
+	fprintf(&__UART__,
+		"HMC5883L debug:\n\tCRA = %d\tCRB = %d\tMODE = %d\tSTATUS = %d\tID_A = %c  ID_B = %c  ID_C = %c\n\n",
+		hmc5883l_debug.cra, hmc5883l_debug.crb, hmc5883l_debug.moder, hmc5883l_debug.status,
+		hmc5883l_debug.ida, hmc5883l_debug.idb, hmc5883l_debug.idc);
 
 //	fprintf(&__UART__, "%5.1f\t%4.1f\t\t%5.1f\t%4.1f\n", power.powL, omega.omegaL, power.powR, omega.omegaR);
-	#define dT		0.025
+//	#define dT		0.025
 // 	phi_x += gyro.gX*dT;
 // 	phi_y += gyro.gY*dT;
-	phi_z += gyro.gZ*dT;
+//	phi_z += gyro.gZ*dT;
 // 	fprintf(&__UART__, "%10.6f\t%10.6f\t\t%10.6f\t%10.6f\t\t%10.6f\t%10.6f\n", 
 // 				gyro.gX, phi_x, gyro.gY, phi_y, gyro.gZ, phi_z);
-	fprintf(&__UART__, "%10.6f\t%10.6f\n", gyro.gZ*180.0/3.14, phi_z*180.0/3.14);
+//	fprintf(&__UART__, "%10.6f\t%10.6f\n", gyro.gZ*180.0/3.14, phi_z*180.0/3.14);
 	
 //	fprintf(&__UART__, "%.2f\n", motion.lin_vel);
 					
@@ -293,7 +318,7 @@ void show_info_lcd (void)
 		
 //	stdout = &_LCD_;
 	
-	fprintf(&__LCD__, "L%5.1f R%5.1f\ngZ%4.0f Sat%2d %c\n", 
+	fprintf(&__LCD__, "L%5.1f R%5.1f\ngZ%4.0f Sat %2d %c\n", 
 				omega.omegaL, omega.omegaR, mpu6050_gyro.gZ*180.0/3.14, gps_info.sats_num, gps_info.status);
 	
 // 	printf ("V:%.3f Om:%5.1f\ngZ %5.1f [deg/s]\n", \

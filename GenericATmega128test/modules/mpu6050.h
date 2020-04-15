@@ -31,9 +31,9 @@ MPU6050_GYRO_DATA mpu6050_get_gyro (void);	// возвращает структ�
 float mpu6050_get_T (void);
 
 /* exit-функции I2C */
-void init_set_exit (void);
-void read_exit (void);
-void poweron_exit (void);
+void mpu6050_init_set_exit (void);
+void mpu6050_read_exit (void);
+void mpu6050_poweron_exit (void);
 /****************/
 
 
@@ -49,10 +49,10 @@ void poweron_exit (void);
 #define MPU6050_AD0				PD4
 
 /* Настройки модуля */
-#define MPU6050_SMPLRT_DIV_VAL	0x1F	// 8 bit; sample rate = 31.25 Hz (раз в 32 мс)
-#define MPU6050_DLPF_VAL		6		// 3 bit; DLPF enabled, gyro output rate = 1kHz (см. register map)
-#define MPU6050_FS_SEL_VAL		3		// 2 bit
-#define MPU6050_AFS_SEL_VAL		3		// 2 bit
+#define MPU6050_SMPLRT_DIV_VAL	24		// sample rate = 40 Hz (раз в 25 мс)
+#define MPU6050_DLPF_VAL		4		// DLPF enabled (BW 20 Hz), gyro output rate = 1kHz
+#define MPU6050_FS_SEL_VAL		3
+#define MPU6050_AFS_SEL_VAL		3
 /********************/
 
 /* В какой части соответствующих регистров расположены группы битов: */
@@ -88,10 +88,10 @@ void poweron_exit (void);
 
 #define MPU6050_STARTUP_DELAY		300		// ms; от init до poweron
 #define MPU6050_READ_STARTUP_DELAY	100		// ms; от poweron до первого read
-#define MPU6050_READ_PERIOD			100		// ms
+#define MPU6050_READ_PERIOD			25		// ms
 
-#define MPU6050_WORD_SIZE		2	// байта на слово (для всех измерений)
-#define MPU6050_DATA_BLOCK		14	// байт (акс + темп + гиро)
+#define MPU6050_WORD_SIZE				2	// байта на слово (для всех измерений)
+#define MPU6050_DATA_BYTES_COUNT		14	// байт (акс + темп + гиро)
 
 /* Как переводить из битов в °/c и g: масштабные коэф-ты в зав-ти от FS и AFS */
 // Необходимо делить показания GYRO на MPU6050_GYRO_SCALE,

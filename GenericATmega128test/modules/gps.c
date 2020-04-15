@@ -271,7 +271,7 @@ inline void gps_init(void)
 	UCSR1C |= (1 << UCSZ11) | (1 << UCSZ10);				// Char size 8 bit
 	UCSR1B |= (0 << TXEN1) | (1 << RXEN1) | (1 << RXCIE1);	// (будем только слушать, а также включим прерывание)
 	
-	__gps_position.alt = 0.0; __gps_position.lat = 55.80172; __gps_position.lon = 37.50211;
+	__gps_position.alt = 0.0; __gps_position.lat = 55.00000; __gps_position.lon = 37.00000;
 	__gps_motion.crs = 0.0; __gps_motion.vel = 0.0;
 	__gps_date.dd = 0; __gps_date.mm = 0; __gps_date.yy = 0;
 	__gps_time.hh = 0; __gps_time.mm = 0; __gps_time.ss = 0;

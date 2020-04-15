@@ -204,6 +204,13 @@ void show_info_uart (void)
 	
 	HMC5883L_DEBUG hmc5883l_debug;
 	hmc5883l_get_debug(&hmc5883l_debug);
+	
+	float mag_hdg = atan2f((float)hmc5883l_raw.mY_raw, (float)hmc5883l_raw.mX_raw);
+	if(mag_hdg < 0)
+	{
+		mag_hdg += 2*M_PI;
+	}
+	mag_hdg *= 180/M_PI;
 
 //	MOTION_PARAMS motion = mcontrol_get_mparams ();
 
@@ -276,11 +283,12 @@ void show_info_uart (void)
 // 		md3_get_voltage());
 		
 	fprintf(&__UART__,
-		"\nGPS:\n\tLAT %8.5f\tLON %8.5f\tVEL %05.2f\tCRS %03d\t\tSATS %2d\t\tHDOP %4.1f\nGYROS:\n\tz %4d\nMAG (raw):\n\tx %5d\t\ty %5d\t\tz %5d\n\nVOLT: %5.2f\n\n",
+		"\nGPS:\n\tLAT %8.5f\tLON %8.5f\tVEL %05.2f\tCRS %03d\t\tSATS %2d\t\tHDOP %4.1f\nGYROS:\n\tz %4d\nMAG (raw):\n\tx %5d\t\ty %5d\t\tz %5d\t\tMAG HDG %3d\n\nVOLT: %5.2f\n\n",
 		gps_pos.lat, gps_pos.lon, gps_motion.vel*0.5144, gps_motion.crs,
 		gps_info.sats_num, gps_info.hdop,
 		(int)(gyro.gZ*180/3.14),
 		hmc5883l_raw.mX_raw, hmc5883l_raw.mY_raw, hmc5883l_raw.mZ_raw,
+		(int)mag_hdg,
 		md3_get_voltage());
 		
 	fprintf(&__UART__,

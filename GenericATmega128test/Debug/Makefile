@@ -49,6 +49,7 @@ C_SRCS +=  \
 ../main.c \
 ../modules/bmp180.c \
 ../modules/gps.c \
+../modules/hmc5883l.c \
 ../modules/md3.c \
 ../modules/motor.c \
 ../modules/mpu6050.c \
@@ -73,6 +74,7 @@ interfaces/uart.o \
 main.o \
 modules/bmp180.o \
 modules/gps.o \
+modules/hmc5883l.o \
 modules/md3.o \
 modules/motor.o \
 modules/mpu6050.o \
@@ -90,6 +92,7 @@ interfaces/uart.o \
 main.o \
 modules/bmp180.o \
 modules/gps.o \
+modules/hmc5883l.o \
 modules/md3.o \
 modules/motor.o \
 modules/mpu6050.o \
@@ -107,6 +110,7 @@ interfaces/uart.d \
 main.d \
 modules/bmp180.d \
 modules/gps.d \
+modules/hmc5883l.d \
 modules/md3.d \
 modules/motor.d \
 modules/mpu6050.d \
@@ -124,6 +128,7 @@ interfaces/uart.d \
 main.d \
 modules/bmp180.d \
 modules/gps.d \
+modules/hmc5883l.d \
 modules/md3.d \
 modules/motor.d \
 modules/mpu6050.d \
@@ -145,6 +150,8 @@ LINKER_SCRIPT_DEP+=
 
 
 # AVR32/GNU C Compiler
+
+
 
 
 

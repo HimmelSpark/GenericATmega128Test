@@ -20,6 +20,8 @@ modules\bmp180.c
 
 modules\gps.c
 
+modules\hmc5883l.c
+
 modules\md3.c
 
 modules\motor.c

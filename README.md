@@ -4,4 +4,4 @@
 
 GenericATmega128test - основной проект. Включает в себя планировщик, модули для работы с интерфейсами UART, I2C, датчиками BMP180 (в т.ч. оцениватель вертикальной скорости) и MPU6050, модуль для работы с двигателем постоянного тока с энкодером (в т.ч. оцениватель скорости и ПИ-регулятор), модуль для работы с 7-сегментным дисплеем ("тупой" дисплей без своего контроллера), модуль для работы со знакосинтезирующим ЖК-дисплеем.
 
-![foxdemo](https://github.com/foxdemo/foxdemo.github.io/blob/master/assets/images/avatar.png)
+![foxdemo](http://airplanes.itsabouttravelling.com/wp-content/uploads/2017/10/c-fusm-westjet-boeing-737-800-01.jpg)

@@ -29,10 +29,19 @@ typedef struct {
 void hmc5883l_init(void);
 void hmc5883l_init_exit(void);
 void hmc5883l_read(void);
-void hmc5883l_read_exit(void);
+void hmc5883l_read_exit(uint8_t *buf_rd);
+
+// Получить составляющие вектора магнитной индукции, Гс
 void hmc5883l_get_mag(HMC5883L_MAG_DATA *mag_p);
+
+// Получить сырые показания датчика
 void hmc5883l_get_raw(HMC5883L_RAW_DATA *raw_p);
+
+// Получить отладочную информацию (содержимое служебных регистров)
 void hmc5883l_get_debug(HMC5883L_DEBUG *hmc5883l_debug);
+
+// Получить магнитный курс (heading), °
+uint16_t hmc5883l_get_mag_hdg(void);
 
 /* Выбор усреднения измерений */
 // Возможные варианты:
@@ -71,7 +80,13 @@ void hmc5883l_get_debug(HMC5883L_DEBUG *hmc5883l_debug);
 	#define HMC5883L_PERIOD	14
 #endif
 
-#define HMC5883L_STARTUP_DELAY	(2*HMC5883L_PERIOD)
+//#define HMC5883L_STARTUP_DELAY	(2*HMC5883L_PERIOD)
+#define HMC5883L_STARTUP_DELAY		100
+
+// Только отладка: //
+#undef	HMC5883L_PERIOD
+#define HMC5883L_PERIOD	50
+////////////////////
 
 /*****************************/
 
@@ -122,6 +137,9 @@ void hmc5883l_get_debug(HMC5883L_DEBUG *hmc5883l_debug);
 #define HMC5883L_ADDR	0b0011110
 
 /* Адреса регистров и положения их битов */
+
+#define HMC5883L_CONF_REG_COUNT	3
+
 #define HMC5883L_CONF_REG_A		0x00	// R/W
 #define HMC5883L_CRA7			7
 #define HMC5883L_CRA6			6

@@ -128,12 +128,15 @@ int main (void)
  	stdout = &__UART__;
 	
 	rtos_set_task (show_info_7seg, 1000, 200);
- 	rtos_set_task (show_info_lcd, 1010, 200);
+ 	rtos_set_task (show_info_lcd, 1010, 100);
 // 	rtos_set_task (show_info_uart, 1050, 300);
 	
 // 	rtos_set_task (bmp180_init, 1, RTOS_RUN_ONCE);
-// 	rtos_set_task (mpu6050_init, 1, RTOS_RUN_ONCE);
-	rtos_set_task (hmc5883l_init, 1, RTOS_RUN_ONCE);
+// 	rtos_set_task (mpu6050_init, 2, RTOS_RUN_ONCE);
+// 	rtos_set_task (hmc5883l_init, 2, RTOS_RUN_ONCE);
+
+	mpu6050_init();
+	hmc5883l_init();
 	 
 	rtos_set_task(gps_init, 1000, RTOS_RUN_ONCE);
 	
@@ -157,10 +160,6 @@ void __top_priority (void)
 
 void show_info_uart (void)
 {
-//	static float time = 0.0;
-	
-//	stdout = &_UART_;
-	
 //	uart_clrscr ();
 	uart_home ();
 
@@ -205,12 +204,7 @@ void show_info_uart (void)
 	HMC5883L_DEBUG hmc5883l_debug;
 	hmc5883l_get_debug(&hmc5883l_debug);
 	
-	float mag_hdg = atan2f((float)hmc5883l_raw.mY_raw, (float)hmc5883l_raw.mX_raw);
-	if(mag_hdg < 0)
-	{
-		mag_hdg += 2*M_PI;
-	}
-	mag_hdg *= 180/M_PI;
+	uint16_t mag_hdg = hmc5883l_get_mag_hdg();
 
 //	MOTION_PARAMS motion = mcontrol_get_mparams ();
 
@@ -288,7 +282,7 @@ void show_info_uart (void)
 		gps_info.sats_num, gps_info.hdop,
 		(int)(gyro.gZ*180/3.14),
 		hmc5883l_raw.mX_raw, hmc5883l_raw.mY_raw, hmc5883l_raw.mZ_raw,
-		(int)mag_hdg,
+		mag_hdg,
 		md3_get_voltage());
 		
 	fprintf(&__UART__,
@@ -312,22 +306,34 @@ void show_info_uart (void)
 
 void show_info_lcd (void)
 {
-//	static float time = -0.1;
-//	time += 0.1;
-
 // 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
 	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro();
+	float temp = mpu6050_get_T();
+	char temp_sign = ' ';
+	if(temp > 0.0)
+	{
+		temp_sign = '+';
+	}
+	else if(temp < 0.0)
+	{
+		temp_sign = '-';
+	}
+	
 //	MOTION_PARAMS motion = mcontrol_get_mparams ();
 //	extern __debug_picontr_data picontr;
 	GPS_INF gps_info;
 	gps_get_info(&gps_info);
 
-	MOTOR_OMEGA_DATA omega = motors_get_omega();
-		
-//	stdout = &_LCD_;
+//	MOTOR_OMEGA_DATA omega = motors_get_omega();
 	
-	fprintf(&__LCD__, "L%5.1f R%5.1f\ngZ%4.0f Sat %2d %c\n", 
-				omega.omegaL, omega.omegaR, mpu6050_gyro.gZ*180.0/3.14, gps_info.sats_num, gps_info.status);
+	uint16_t mag_hdg = hmc5883l_get_mag_hdg();
+
+	
+// 	fprintf(&__LCD__, "L%5.1f R%5.1f\ngZ%4.0f Sat %2d %c\n", 
+// 				omega.omegaL, omega.omegaR, mpu6050_gyro.gZ*180.0/3.14, gps_info.sats_num, gps_info.status);
+
+	fprintf(&__LCD__, "HDG%03d T%c%4.1f\ngZ%4.0f Sat %2d %c\n",
+				mag_hdg, temp_sign, temp, mpu6050_gyro.gZ*180.0/3.14, gps_info.sats_num, gps_info.status);
 	
 // 	printf ("V:%.3f Om:%5.1f\ngZ %5.1f [deg/s]\n", \
 // 			motion.lin_vel, motion.ang_vel * 180.0 / 3.14, mpu6050_gyro.gZ);

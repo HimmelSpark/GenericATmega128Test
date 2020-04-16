@@ -10,28 +10,26 @@
 
 #include "../general.h"
 #include <util/twi.h>
+#include <stdlib.h>
 #include "i2c.h"
 #include "../rtos.h"
 #include "../modules/md3.h"
 
-uint8_t i2c_mode;
+uint8_t i2c_mode				= I2C_IDLE;	// режим
 
-uint8_t i2c_sla_addr;				// 7 битов адреса
-uint8_t i2c_reg_addr;				// регистр, в который пишем (или начиная с которого читатем)
-uint8_t i2c_data;					// байт, который кладём в регистр
-uint8_t i2c_bytes2read_count;		// сколько байтов прочитать
-uint8_t i2c_byte2read_index = 0;	// какой читаем
-uint8_t i2c_bytes2write_count;		// сколько байтов записать
-uint8_t i2c_byte2write_index = 0;	// какой пишем
+uint8_t i2c_sla_addr	= 0x00;		// 7 битов адреса
+uint8_t i2c_reg_addr	= 0x00;		// адрес первого регистра, в который пишем/читаем
+uint8_t *i2c_buf;					// буфер записи/чтения
+uint8_t i2c_bytes_count	= 0;		// сколько байтов записать/прочитать
+uint8_t i2c_byte_index	= 0;		// какой по счёту
 
-/* Переменные, которые по смыслу должны быть доступны в других файлах */
 volatile uint8_t i2c_status		= 0x00;
 volatile uint8_t i2c_collisions = 0;	// сколько коллизий произошло
-uint8_t i2c_read_buffer[I2C_MAX_READ_BYTES_COUNT];
-uint8_t i2c_write_buffer[I2C_MAX_WRITE_BYTES_COUNT];
-/****************************************************************/
 
-I2C_EXIT_F i2c_exit_func = i2c_exit_func_idle;	// по умолчанию после выхода из автомата I2C ничего не делаем
+// Выходные функции для записи и для чтения с шины I2C
+// (по умолчанию после выхода из автомата I2C ничего не делаем)
+I2C_EXIT_F_WR i2c_exit_func_wr = i2c_exit_func_wr_idle;
+I2C_EXIT_F_RD i2c_exit_func_rd = i2c_exit_func_rd_idle;
 
 inline void i2c_init (void)
 {
@@ -46,7 +44,7 @@ inline void i2c_init (void)
 }
 
 inline void __i2c_routine (void)
-{	// Вызов по прерыванию
+{// ISR
 	switch (TW_STATUS)
 	{
 		case TW_BUS_ERROR:
@@ -69,61 +67,47 @@ inline void __i2c_routine (void)
 			break;
 		}
 		case TW_MT_DATA_ACK:
-		{
-			if (i2c_mode == I2C_WRITE_BYTE2REG)
+		{ 
+			if (i2c_mode == I2C_WRITE_BYTES)
 			{
-				if (!(i2c_status & (1 << I2C_STATUS_DATA_SENT)))
+				if (i2c_byte_index < i2c_bytes_count)
 				{
-					TWDR = i2c_data;
-					i2c_status |= 1 << I2C_STATUS_DATA_SENT;
+					TWDR = i2c_buf[i2c_byte_index];
+					i2c_byte_index++;
 					TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE);
 				}
 				else
 				{
 					TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (1 << TWSTO) | (1 << TWEN) | (1 << TWIE);
+					
+					i2c_exit_func_wr();
 					i2c_status &= ~(1 << I2C_STATUS_BUSY); // шина свободна
 					
-					i2c_exit_func ();	// до обнуления, чтобы функция имела доступ к актуальному i2c_data_sent
-					i2c_status &= ~(1 << I2C_STATUS_DATA_SENT);
+					// Подготовимся к следующему чтению/записи
+					i2c_bytes_count = 0;
+					i2c_byte_index = 0;
+					free(i2c_buf);
+					
+					rtos_delete_task(i2c_watchdog);
 				}
 			}
 			else if (i2c_mode == I2C_READ_BYTES)
 			{
 				TWCR = (1 << TWINT) | (0 << TWEA) | (1 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE);
 			}
-			else if (i2c_mode == I2C_WRITE_BYTES)
-			{
-				if (i2c_byte2write_index < i2c_bytes2write_count)
-				{
-					TWDR = i2c_write_buffer[i2c_byte2write_index];
-					i2c_byte2write_index++;
-					TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE);
-				}
-				else
-				{
-					TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (1 << TWSTO) | (1 << TWEN) | (1 << TWIE);
-					i2c_status &= ~(1 << I2C_STATUS_BUSY); // шина свободна
-					
-					i2c_status |= 1 << I2C_STATUS_DATA_SENT; // ToDo: нафиг не нужно вроде?
-					i2c_exit_func ();	// до обнуления, чтобы функция имела доступ к актуальному i2c_data_sent
-					i2c_status &= ~(1 << I2C_STATUS_DATA_SENT); // ToDo: нафиг не нужно вроде?
-					
-					i2c_byte2write_index = 0; // подготовимся к следующей записи
-				}
-			}
+			
 			break;
 		}
-		
 		case TW_REP_START:
 		{ 
 			TWDR = (i2c_sla_addr << 1) | I2C_R;
 			TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE);
+			
 			break;
 		}
-		
 		case TW_MR_SLA_ACK:
 		{
-			if (i2c_bytes2read_count == 1)
+			if (i2c_bytes_count == 1)
 			{	// если читаем 1 байт, сразу позаботимся о том, чтобы вовремя закончить читать:
 				// "Data byte will be received and NOT ACK will be returned":
 				TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE);
@@ -133,17 +117,15 @@ inline void __i2c_routine (void)
 				// "Data byte will be received and ACK will be returned":
 				TWCR = (1 << TWINT) | (1 << TWEA) | (0 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE);
 			}
+			
 			break;
 		}
-		
 		case TW_MR_DATA_ACK:
 		{ 
-			i2c_read_buffer[i2c_byte2read_index] = TWDR;
-			i2c_byte2read_index++;
-			
-//			printf("rd:%d\n", i2c_byte2read_index);	// ОТЛАДКА
+			i2c_buf[i2c_byte_index] = TWDR;
+			i2c_byte_index++;
 
-			if ((i2c_byte2read_index+1) == i2c_bytes2read_count) // позаботимся о том, чтобы вовремя закончить читать:
+			if ((i2c_byte_index+1) == i2c_bytes_count) // позаботимся о том, чтобы вовремя закончить читать:
 			{	// на следующем "такте" I2C:
 				TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE);
 			}
@@ -154,26 +136,29 @@ inline void __i2c_routine (void)
 			
 			break;
 		}
-		
 		case TW_MR_DATA_NACK:
 		{
-			i2c_read_buffer[i2c_byte2read_index] = TWDR;
+			i2c_buf[i2c_byte_index] = TWDR;
 			TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (1 << TWSTO) | (1 << TWEN) | (1 << TWIE);
+			
+			i2c_exit_func_rd(i2c_buf);
 			i2c_status &= ~(1 << I2C_STATUS_BUSY); // шина свободна
 			
-			i2c_status |= 1 << I2C_STATUS_DATA_RECEIVED; // ToDo: нафиг не нужно вроде?
-			i2c_exit_func ();
-			i2c_status &= ~(1 << I2C_STATUS_DATA_RECEIVED); // ToDo: нафиг не нужно вроде?
+			// Подготовимся к следующему чтению/записи
+			i2c_bytes_count = 0;
+			i2c_byte_index = 0;
+			free(i2c_buf);
 			
-			i2c_byte2read_index = 0;	// подготовимся к следующему чтению
+			rtos_delete_task(i2c_watchdog);
+			
 			break;
 		}
-		
 		default:
 		{
 //			printf ("errd\n");
 			led_y_blink ();
 			TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (1 << TWSTO) | (1 << TWEN) | (1 << TWIE);
+			
 			break;
 		}
 	}
@@ -181,76 +166,99 @@ inline void __i2c_routine (void)
 	return;
 }
 
-int i2c_write_byte2reg (uint8_t sla_addr, uint8_t reg_addr, uint8_t data, I2C_EXIT_F exit_func)
-{
-	if (!(i2c_status & (1 << I2C_STATUS_BUSY)))
-	{
- 		i2c_status |= 1 << I2C_STATUS_BUSY;
-
-		i2c_mode = I2C_WRITE_BYTE2REG;
-	
-		i2c_sla_addr = sla_addr;
-		i2c_reg_addr = reg_addr;
-		i2c_data = data;
-		i2c_exit_func = exit_func;
-	
-		TWCR = (1 << TWINT) | (0 << TWEA) | (1 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE); // START
-		return 0;	// OK
-	}
-	
-	led_y_blink ();
-	i2c_collisions++;
-	
-	return 1;		// не ОК
-}
-
-int i2c_read_bytes (uint8_t sla_addr, uint8_t start_reg_addr, uint8_t bytes_count, I2C_EXIT_F exit_func)
+int i2c_write(uint8_t slave_addr, uint8_t start_reg_addr, uint8_t *wr_buf, uint8_t bytes_count, I2C_EXIT_F_WR exit_func)
 {
 	if (!(i2c_status & (1 << I2C_STATUS_BUSY)))
 	{
 		i2c_status |= 1 << I2C_STATUS_BUSY;
-	
-		i2c_mode = I2C_READ_BYTES;
-	
-		i2c_sla_addr = sla_addr;
-		i2c_reg_addr = start_reg_addr;
-		i2c_bytes2read_count = bytes_count;
-		i2c_exit_func = exit_func;
-	
-		TWCR = (1 << TWINT) | (0 << TWEA) | (1 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE); // START
-		return 0;	// OK
-	}
-	
-	led_y_blink ();
-	i2c_collisions++;
-	
-	return 1;		// не ОК
-}
-
-int i2c_write_from_buffer (uint8_t sla_addr, uint8_t start_reg_addr, uint8_t bytes_count, I2C_EXIT_F exit_func)
-{
-	if (!(i2c_status & (1 << I2C_STATUS_BUSY)))
-	{	
-		i2c_status |= 1 << I2C_STATUS_BUSY;
+		rtos_set_task(i2c_watchdog, I2C_WATCHDOG_DELAY, RTOS_RUN_ONCE);
 		
 		i2c_mode = I2C_WRITE_BYTES;
 		
-		i2c_sla_addr = sla_addr;
+		i2c_sla_addr = slave_addr;
 		i2c_reg_addr = start_reg_addr;
-		i2c_bytes2write_count = bytes_count;
-		i2c_exit_func = exit_func;
+		i2c_bytes_count = bytes_count;
+		
+		i2c_buf = (uint8_t *) malloc(i2c_bytes_count);			// выделяем память под буфер, который будет сохраняться
+																// между вызовами i2c_routine
+		for(register uint8_t i = 0; i < i2c_bytes_count; i++)	// и копируем в него байты для передачи
+		{
+			i2c_buf[i] = wr_buf[i];
+		}
+		
+		i2c_exit_func_wr = exit_func;
 		
 		TWCR = (1 << TWINT) | (0 << TWEA) | (1 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE); // START
-		return 0;	// OK
+		
+		return 0;	// успешно
 	}
 	
 	led_y_blink ();
 	i2c_collisions++;
 	
-	return 1;		// не ОК
+	return 1;	// шина занята	
 }
 
-void i2c_exit_func_idle (void)
+int i2c_write_byte_to_reg(uint8_t slave_addr, uint8_t reg_addr, uint8_t data, I2C_EXIT_F_WR exit_func)
 {
+	int res = i2c_write(slave_addr, reg_addr, &data, 1, exit_func);
+	
+	return res;
+}
+
+int i2c_read(uint8_t slave_addr, uint8_t start_reg_addr, uint8_t bytes_count, I2C_EXIT_F_RD exit_func)
+{
+	if (!(i2c_status & (1 << I2C_STATUS_BUSY)))
+	{
+		i2c_status |= 1 << I2C_STATUS_BUSY;
+		rtos_set_task(i2c_watchdog, I2C_WATCHDOG_DELAY, RTOS_RUN_ONCE);
+
+		i2c_mode = I2C_READ_BYTES;
+
+		i2c_sla_addr = slave_addr;
+		i2c_reg_addr = start_reg_addr;
+		i2c_bytes_count = bytes_count;
+		
+		i2c_buf = (uint8_t *) malloc(i2c_bytes_count);		// выделяем память под буфер, который будет
+															// сохраняться между вызовами i2c_routine
+		i2c_exit_func_rd = exit_func;
+
+		TWCR = (1 << TWINT) | (0 << TWEA) | (1 << TWSTA) | (0 << TWSTO) | (1 << TWEN) | (1 << TWIE); // START
+		
+		return 0;	// успешно
+	}
+
+	led_y_blink ();
+	i2c_collisions++;
+
+	return 1;	// шина занята
+}
+
+int i2c_read_from_byte(uint8_t slave_addr, uint8_t reg_addr, I2C_EXIT_F_RD exit_func)
+{
+	int res = i2c_read(slave_addr, reg_addr, 1, exit_func);
+	
+	return res;
+}
+
+void i2c_exit_func_wr_idle (void)
+{
+	return;
+}
+
+void i2c_exit_func_rd_idle(uint8_t *rd_buf)
+{
+	return;
+}
+
+void i2c_watchdog(void)
+{
+	// ToDo: Вообще, в идеале надо сделать, чтобы вотчдог удалял "проблемную" задачу,
+	// которая вешает шину. Текущая реализация позволяет только раз в период
+	// освободить шину, после чего она снова будет занята "проблемной" задачей
+	
+	// Принудительно снимаем флаг занятонсти шины
+	i2c_status &= ~(1 << I2C_STATUS_BUSY);
+	
 	return;
 }

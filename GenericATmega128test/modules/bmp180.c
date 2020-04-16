@@ -27,10 +27,6 @@ volatile long UT, UP, p;
 long bmp180_T = 0, bmp180_P = 0, bmp180_P0 = 101325; // Па; P0 ещё будет меняться по требованию пользователя
 float bmp180_H = 0;
 
-/* Область переменных из модуля i2c.c */
-extern uint8_t i2c_read_buffer[I2C_MAX_READ_BYTES_COUNT];
-/**************************************/
-
 static uint8_t __estimator_reset = 1;	// флаг сброса интеграторов оценивателя;
 // static потому, что переменная с таким же именем используется в оценивателе в motor.c
 
@@ -44,54 +40,59 @@ double C1 = 44330.0, C2 = 0.19029, C3 = 4945.0;
 
 void bmp180_init (void)
 {
-	int res = i2c_read_bytes (BMP180_ADDR, BMP180_AC1_ADDR_HI, BMP180_CAL_BYTES_COUNT, read_params_exit);
+	int res = i2c_read(BMP180_ADDR, BMP180_AC1_ADDR_HI, BMP180_CAL_BYTES_COUNT, read_params_exit);
 	if (res)
 	{
-		rtos_set_task (bmp180_init, 40, RTOS_RUN_ONCE);
-	}
+		rtos_set_task (bmp180_init, 5, RTOS_RUN_ONCE);
+	}	
 	
 	return;
 }
 
-void read_params_exit (void)
+void read_params_exit (uint8_t *buf_rd)
 {
-	AC1 = (i2c_read_buffer[0]	<< 8)	| i2c_read_buffer[1];
-	AC2 = (i2c_read_buffer[2]	<< 8)	| i2c_read_buffer[3];
-	AC3 = (i2c_read_buffer[4]	<< 8)	| i2c_read_buffer[5];
-	AC4 = (i2c_read_buffer[6]	<< 8)	| i2c_read_buffer[7];
-	AC5 = (i2c_read_buffer[8]	<< 8)	| i2c_read_buffer[9];
-	AC6 = (i2c_read_buffer[10]	<< 8)	| i2c_read_buffer[11];
-	B1	= (i2c_read_buffer[12]	<< 8)	| i2c_read_buffer[13];
-	B2	= (i2c_read_buffer[14]	<< 8)	| i2c_read_buffer[15];
-	MB	= (i2c_read_buffer[16]	<< 8)	| i2c_read_buffer[17];
-	MC	= (i2c_read_buffer[18]	<< 8)	| i2c_read_buffer[19];
-	MD	= (i2c_read_buffer[20]	<< 8)	| i2c_read_buffer[21];
+	AC1 = (buf_rd[0]	<< 8)	| buf_rd[1];
+	AC2 = (buf_rd[2]	<< 8)	| buf_rd[3];
+	AC3 = (buf_rd[4]	<< 8)	| buf_rd[5];
+	AC4 = (buf_rd[6]	<< 8)	| buf_rd[7];
+	AC5 = (buf_rd[8]	<< 8)	| buf_rd[9];
+	AC6 = (buf_rd[10]	<< 8)	| buf_rd[11];
+	B1	= (buf_rd[12]	<< 8)	| buf_rd[13];
+	B2	= (buf_rd[14]	<< 8)	| buf_rd[15];
+	MB	= (buf_rd[16]	<< 8)	| buf_rd[17];
+	MC	= (buf_rd[18]	<< 8)	| buf_rd[19];
+	MD	= (buf_rd[20]	<< 8)	| buf_rd[21];
 	
-	rtos_set_task (bmp180_start_UT, BMP180_STARTUP_DELAY, BMP180_READ_PERIOD);	// теперь готовы читать данные
+	rtos_set_task (bmp180_start_UT, BMP180_STARTUP_DELAY, RTOS_RUN_ONCE);	// теперь готовы читать данные
 	
 	return;
 }
 
 void bmp180_start_UT (void)	// вызов этой функции даёт начало цепочке измерения температуры и давления
 {
-	int res = i2c_write_byte2reg (BMP180_ADDR, BMP180_CTRL_REG_ADDR, BMP180_REQ_UT, start_UT_exit);
+	// Сразу запланируем следующее чтение через период:
+	rtos_set_task (bmp180_start_UT, BMP180_READ_PERIOD, RTOS_RUN_ONCE);
+	
+	int res = i2c_write_byte_to_reg(BMP180_ADDR, BMP180_CTRL_REG_ADDR, BMP180_REQ_UT, start_UT_exit);
 	if (res)
 	{
+		// Если шина занята, вернёмся сюда как можно быстрее
 		rtos_set_task (bmp180_start_UT, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
 	}
-	
+
 	return;
 }
 
  void start_UT_exit (void)
  {
 	rtos_set_task (bmp180_read_UT, BMP180_UT_READ_DELAY, RTOS_RUN_ONCE);
+	
  	return;
  }
 
 void bmp180_read_UT (void)
 {
-	int res = i2c_read_bytes (BMP180_ADDR, BMP180_MEASUREMENT_HI, BMP180_UT_WORD_SIZE, read_UT_exit);
+	int res = i2c_read(BMP180_ADDR, BMP180_MEASUREMENT_HI, BMP180_UT_WORD_SIZE, read_UT_exit);
 	if (res)
 	{
 		rtos_set_task (bmp180_read_UT, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
@@ -100,9 +101,9 @@ void bmp180_read_UT (void)
 	return;
 }
 
- void read_UT_exit (void)
+ void read_UT_exit (uint8_t *buf_rd)
  {
-	UT = (i2c_read_buffer[0] << 8) | i2c_read_buffer[1];
+	UT = (buf_rd[0] << 8) | buf_rd[1];
 	rtos_set_task (bmp180_start_UP, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
 	
  	return;
@@ -110,7 +111,7 @@ void bmp180_read_UT (void)
 
 void bmp180_start_UP (void)
 {
-	int res = i2c_write_byte2reg (BMP180_ADDR, BMP180_CTRL_REG_ADDR, (BMP180_REQ_UP | (BMP180_OSS << 6)), start_UP_exit);
+	int res = i2c_write_byte_to_reg(BMP180_ADDR, BMP180_CTRL_REG_ADDR, (BMP180_REQ_UP | (BMP180_OSS << 6)), start_UP_exit);
 	if (res)
 	{
 		rtos_set_task(bmp180_start_UP, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
@@ -122,12 +123,13 @@ void bmp180_start_UP (void)
  void start_UP_exit (void)
  {
 	rtos_set_task (bmp180_read_UP, BMP180_UP_READ_DELAY, RTOS_RUN_ONCE);
+	
 	return;
  }
 
 void bmp180_read_UP (void)
 {
-	int res = i2c_read_bytes (BMP180_ADDR, BMP180_MEASUREMENT_HI, BMP180_UP_WORD_SIZE, read_UP_exit);
+	int res = i2c_read(BMP180_ADDR, BMP180_MEASUREMENT_HI, BMP180_UP_WORD_SIZE, read_UP_exit);
 	if (res)
 	{
 		rtos_set_task (bmp180_read_UP, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
@@ -136,13 +138,14 @@ void bmp180_read_UP (void)
 	return;
 }
 
- void read_UP_exit (void)
+ void read_UP_exit (uint8_t *buf_rd)
  {
  	uint32_t MSB, LSB, XLSB;
- 	MSB		= i2c_read_buffer[0];
- 	LSB		= i2c_read_buffer[1];
- 	XLSB	= i2c_read_buffer[2];
+ 	MSB		= buf_rd[0];
+ 	LSB		= buf_rd[1];
+ 	XLSB	= buf_rd[2];
  	UP = ((MSB << 16) | (LSB << 8) | XLSB) >> (8 - BMP180_OSS);
+	 
 	rtos_set_task (bmp180_calc_T, RTOS_RUN_ASAP, RTOS_RUN_ONCE);
 	
  	return;

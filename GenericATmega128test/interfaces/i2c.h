@@ -9,32 +9,49 @@
 #ifndef I2C_H_
 #define I2C_H_
 
-typedef void (*I2C_EXIT_F)(void); // тип указателя на функцию
+// Тип указателя на выходную функцию в случае ЗАПИСИ данных на I2C
+// (после записи данных в выходную функцию ничего не передаётся)
+typedef void (*I2C_EXIT_F_WR)(void);
+
+// Тип указателя на выходную функцию в случае ЧТЕНИЯ данных с I2C
+// (после чтения данных в выходную функцию передаётся указатель на
+// буфер принятых данных [и его размер?])
+typedef void (*I2C_EXIT_F_RD)(uint8_t *rd_buf);
+
+void __i2c_routine (void);
 
 void i2c_init (void);
-void __i2c_routine (void);
-int i2c_write_byte2reg (uint8_t sla_addr, uint8_t reg_addr, uint8_t data, I2C_EXIT_F exit_func);
-int i2c_read_bytes (uint8_t sla_addr, uint8_t start_reg_addr, uint8_t bytes_count, I2C_EXIT_F exit_func); 
-int i2c_write_from_buffer (uint8_t sla_addr, uint8_t start_reg_addr, uint8_t bytes_count, I2C_EXIT_F exit_func);\
-// в i2c_write_from_buffer данные класть через массив i2c_write_buffer
 
-void i2c_exit_func_idle (void);
+// Запись из буфера, предоставляемого пользователем, начиная с заданного адреса
+int i2c_write(uint8_t slave_addr, uint8_t start_reg_addr, uint8_t *wr_buf, uint8_t bytes_count, I2C_EXIT_F_WR exit_func);
+
+// Запись одного байта по указанному адресу регистра
+int i2c_write_byte_to_reg(uint8_t slave_addr, uint8_t reg_addr, uint8_t data, I2C_EXIT_F_WR exit_func);
+
+// Чтение, начиная с заданного адреса. 
+int i2c_read(uint8_t slave_addr, uint8_t start_reg_addr, uint8_t bytes_count, I2C_EXIT_F_RD exit_func);
+
+// Чтение одного байта по указанному адресу
+int i2c_read_from_byte(uint8_t slave_addr, uint8_t reg_addr, I2C_EXIT_F_RD exit_func);
+
+void i2c_exit_func_wr_idle (void);
+void i2c_exit_func_rd_idle (uint8_t *rd_buf);
+
+// Предотвращает занятие шины в случае неответа какого-либо устройства
+void i2c_watchdog(void);
 
 
-#define I2C_SCL_PIN PD0
-#define I2C_SDA_PIN PD1
+#define I2C_SCL_PIN		PD0
+#define I2C_SDA_PIN		PD1
 
 #define I2C_PORT_DDR	DDRD
 #define I2C_PORT		PORTD
 
-#define I2C_MAX_READ_BYTES_COUNT	22
-#define I2C_MAX_WRITE_BYTES_COUNT	8
-
 /* Режимы I2C */
 
-#define I2C_WRITE_BYTE2REG	0x00
-#define I2C_READ_BYTES		0x01
-#define I2C_WRITE_BYTES		0x02
+#define I2C_IDLE			0x00
+#define I2C_WRITE_BYTES		0x01
+#define I2C_READ_BYTES		0x02
 
 /**************/
 
@@ -49,8 +66,9 @@ void i2c_exit_func_idle (void);
 //     T O   D O (?) |       D   O   N   E		   |
 
 #define I2C_STATUS_BUSY				0
-#define I2C_STATUS_DATA_SENT		1
-#define I2C_STATUS_DATA_RECEIVED	2
+
+#define I2C_WATCHDOG_DELAY			2000	// мс, в случае неответа после этого времени
+											// флаг занятости шины принудительно снимается
 
 
 #endif /* I2C_H_ */

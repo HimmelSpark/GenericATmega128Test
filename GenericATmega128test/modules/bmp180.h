@@ -27,11 +27,11 @@ double bmp180_get_P_mmHg (void);// последнее измеренное да�
 float bmp180_get_T (void);		// последняя измеренная температура, °C
 
 /* Функции выхода */
-void read_params_exit (void);
+void read_params_exit (uint8_t *buf_rd);
 void start_UT_exit (void);
-void read_UT_exit (void);
+void read_UT_exit (uint8_t *buf_rd);
 void start_UP_exit (void);
-void read_UP_exit (void);
+void read_UP_exit (uint8_t *buf_rd);
 /******************/
 
 

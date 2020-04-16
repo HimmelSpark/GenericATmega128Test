@@ -22,7 +22,8 @@ typedef struct {
 	} MPU6050_GYRO_DATA;
 
 void mpu6050_init (void);
-void mpu6050_init_set (void);
+void mpu6050_init_hw(void);
+void mpu6050_init_i2c (void);
 void mpu6050_poweron (void);
 void mpu6050_read (void);
 
@@ -32,8 +33,8 @@ float mpu6050_get_T (void);
 
 /* exit-функции I2C */
 void mpu6050_init_set_exit (void);
-void mpu6050_read_exit (void);
 void mpu6050_poweron_exit (void);
+void mpu6050_read_exit (uint8_t *buf_rd);
 /****************/
 
 
@@ -41,7 +42,8 @@ void mpu6050_poweron_exit (void);
 // 0b110100X, где X определяется уровнем на AD0 (задаётся далее):
 #define MPU6050_ADDR_MSBs		0b110100
 #define MPU6050_ADDR_LSB		0			// оно же - уровень на AD0
-// Итоговый адрес = (MPU6050_ADDR_MSBs << 1) | MPU6050_ADDR_LSB
+// Итоговый адрес:
+#define MPU6050_ADDR			(MPU6050_ADDR_MSBs << 1) | MPU6050_ADDR_LSB
 /****************/
 
 #define MPU6050_AD0_PORT		PORTD
@@ -53,6 +55,7 @@ void mpu6050_poweron_exit (void);
 #define MPU6050_DLPF_VAL		4		// DLPF enabled (BW 20 Hz), gyro output rate = 1kHz
 #define MPU6050_FS_SEL_VAL		3
 #define MPU6050_AFS_SEL_VAL		3
+#define MPU6050_DEFAULT_PWR		0x00	// режим по умолчанию -  выходим из sleep + не используем cycle, temp_dis и clksel
 /********************/
 
 /* В какой части соответствующих регистров расположены группы битов: */
@@ -86,9 +89,9 @@ void mpu6050_poweron_exit (void);
 
 /********************/
 
-#define MPU6050_STARTUP_DELAY		300		// ms; от init до poweron
-#define MPU6050_READ_STARTUP_DELAY	100		// ms; от poweron до первого read
-#define MPU6050_READ_PERIOD			25		// ms
+#define MPU6050_STARTUP_DELAY		50		// ms; от init до poweron
+#define MPU6050_READ_STARTUP_DELAY	50		// ms; от poweron до первого read
+#define MPU6050_READ_PERIOD			50		// ms
 
 #define MPU6050_WORD_SIZE				2	// байта на слово (для всех измерений)
 #define MPU6050_DATA_BYTES_COUNT		14	// байт (акс + темп + гиро)

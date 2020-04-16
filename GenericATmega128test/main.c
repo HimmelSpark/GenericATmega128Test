@@ -306,11 +306,19 @@ void show_info_uart (void)
 
 void show_info_lcd (void)
 {
-//	static float time = -0.1;
-//	time += 0.1;
-
 // 	MPU6050_ACCEL_DATA mpu6050_accel = mpu6050_get_accel ();
 	MPU6050_GYRO_DATA mpu6050_gyro = mpu6050_get_gyro();
+	float temp = mpu6050_get_T();
+	char temp_sign = ' ';
+	if(temp > 0.0)
+	{
+		temp_sign = '+';
+	}
+	else if(temp < 0.0)
+	{
+		temp_sign = '-';
+	}
+	
 //	MOTION_PARAMS motion = mcontrol_get_mparams ();
 //	extern __debug_picontr_data picontr;
 	GPS_INF gps_info;
@@ -324,8 +332,8 @@ void show_info_lcd (void)
 // 	fprintf(&__LCD__, "L%5.1f R%5.1f\ngZ%4.0f Sat %2d %c\n", 
 // 				omega.omegaL, omega.omegaR, mpu6050_gyro.gZ*180.0/3.14, gps_info.sats_num, gps_info.status);
 
-	fprintf(&__LCD__, "MAG HDG %03d\ngZ%4.0f Sat %2d %c\n",
-				mag_hdg, mpu6050_gyro.gZ*180.0/3.14, gps_info.sats_num, gps_info.status);
+	fprintf(&__LCD__, "HDG%03d T%c%4.1f\ngZ%4.0f Sat %2d %c\n",
+				mag_hdg, temp_sign, temp, mpu6050_gyro.gZ*180.0/3.14, gps_info.sats_num, gps_info.status);
 	
 // 	printf ("V:%.3f Om:%5.1f\ngZ %5.1f [deg/s]\n", \
 // 			motion.lin_vel, motion.ang_vel * 180.0 / 3.14, mpu6050_gyro.gZ);

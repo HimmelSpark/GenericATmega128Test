@@ -12,19 +12,20 @@
 #include <util/twi.h>
 #include <stdlib.h>
 #include "i2c.h"
+#include "uart.h"
 #include "../rtos.h"
 #include "../modules/md3.h"
 
 uint8_t i2c_mode				= I2C_IDLE;	// режим
+volatile uint8_t i2c_status		= 0x00;		// флаги статуса шины
 
-uint8_t i2c_sla_addr	= 0x00;		// 7 битов адреса
-uint8_t i2c_reg_addr	= 0x00;		// адрес первого регистра, в который пишем/читаем
-uint8_t *i2c_buf;					// буфер записи/чтения
-uint8_t i2c_bytes_count	= 0;		// сколько байтов записать/прочитать
-uint8_t i2c_byte_index	= 0;		// какой по счёту
+uint8_t i2c_sla_addr	= 0x00;				// 7 битов адреса
+uint8_t i2c_reg_addr	= 0x00;				// адрес первого регистра, в который пишем/читаем
+uint8_t *i2c_buf;							// буфер записи/чтения
+volatile uint8_t i2c_bytes_count	= 0;	// сколько байтов записать/прочитать
+volatile uint8_t i2c_byte_index		= 0;	// какой по счёту
 
-volatile uint8_t i2c_status		= 0x00;
-volatile uint8_t i2c_collisions = 0;	// сколько коллизий произошло
+uint8_t i2c_collisions = 0;	// сколько коллизий произошло
 
 // Выходные функции для записи и для чтения с шины I2C
 // (по умолчанию после выхода из автомата I2C ничего не делаем)
@@ -49,7 +50,7 @@ inline void __i2c_routine (void)
 	{
 		case TW_BUS_ERROR:
 		{
-//			printf ("errb\n");
+			uart_puts("[ ! ] I2C bus error\n");
 			led_r_blink ();
 			TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (1 << TWSTO) | (1 << TWEN) | (1 << TWIE);
 			break;
@@ -155,7 +156,7 @@ inline void __i2c_routine (void)
 		}
 		default:
 		{
-//			printf ("errd\n");
+			uart_puts("[ ! ] I2C routine default case\n");
 			led_y_blink ();
 			TWCR = (1 << TWINT) | (0 << TWEA) | (0 << TWSTA) | (1 << TWSTO) | (1 << TWEN) | (1 << TWIE);
 			
